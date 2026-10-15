@@ -2,7 +2,7 @@
 
 Find meeting times that work for a team spread across time zones.
 
-**[Try it live →](https://zahidhasann88.github.io/tzmeet/)**
+**[Try it live →](https://zahidhasann88.github.io/tzmeet/)** · CLI on npm: [`tzmeet`](https://www.npmjs.com/package/tzmeet)
 
 ![Shared 24-hour timeline for Dhaka, London and New York](docs/screenshots/demo.png)
 
@@ -34,6 +34,14 @@ Other useful commands: `pnpm lint`, `pnpm typecheck`, `pnpm test:e2e` (Playwrigh
 
 ## CLI
 
+Try it without installing anything:
+
+```sh
+npx tzmeet --zones Asia/Dhaka,Europe/London --date 2026-11-02
+```
+
+Or install it with `npm install --global tzmeet`:
+
 ```sh
 tzmeet --zones Asia/Dhaka,America/New_York,Europe/London \
   --date 2026-11-02 --duration 30 --top 2
@@ -62,7 +70,7 @@ If a `tzmeet.config.json` exists in the current directory it is loaded automatic
 
 Exit code is `1` for invalid input. Finding no slots is not an error: you get exit `0` and an explanation of what blocked them.
 
-To try it before it's on npm:
+To run it from a clone of this repo:
 
 ```sh
 pnpm build
