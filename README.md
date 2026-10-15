@@ -2,7 +2,7 @@
 
 Find meeting times that work for a team spread across time zones.
 
-**[Try it live →](https://zahidhasann88.github.io/tzmeet/)** · CLI on npm: [`tzmeet`](https://www.npmjs.com/package/tzmeet)
+**[Try it live →](https://zahidhasann88.github.io/tzmeet/)** · CLI on npm: [`tzmeet`](https://www.npmjs.com/package/tzmeet) · [API docs](https://tzmeet-api.onrender.com/docs)
 
 ![Shared 24-hour timeline for Dhaka, London and New York](docs/screenshots/demo.png)
 
@@ -136,6 +136,14 @@ If nothing fits, the result explains which constraint rejected the most candidat
 ## API
 
 The API wraps the same core; it doesn't add any scheduling logic of its own.
+
+A public demo runs at **https://tzmeet-api.onrender.com**, with interactive docs at [/docs](https://tzmeet-api.onrender.com/docs). It's on a free plan, so the first request after a quiet period can take up to a minute while it wakes up. Try it:
+
+```sh
+curl "https://tzmeet-api.onrender.com/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&top=3&format=text"
+```
+
+To run it locally:
 
 ```sh
 pnpm --filter @tzmeet/api... build
