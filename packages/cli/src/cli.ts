@@ -34,6 +34,7 @@ export function runCLI(args: string[] = process.argv.slice(2), context: CliConte
     .option('--work <HH:mm-HH:mm>', 'override work hours in every zone (default: 09:00-18:00)')
     .option('--zone-work <IANA_ZONE=HH:mm-HH:mm>', 'per-zone work override; repeatable', collect)
     .option('--weekend <IANA_ZONE=days>', 'per-zone weekend, e.g. Asia/Dhaka=fri,sat; repeatable', collect)
+    .option('--holiday <IANA_ZONE=dates>', 'per-zone holiday dates, e.g. Asia/Dhaka=2026-12-16,2026-12-25; repeatable', collect)
     .option('--quiet <HH:mm-HH:mm>', 'override allowed hours in every zone (default: 08:00-21:00)')
     .option('--prayer-buffer <minutes>', 'symmetric prayer buffer (default when enabled: 10)')
     .option('--prayer-location <city-or-lat,lng>', 'enable prayers using a built-in city or coordinates')
@@ -49,7 +50,7 @@ Examples:
   tzmeet zones london
 
 Precedence: config/defaults < global flags < per-zone flags.
-Default weekend is Sat/Sun, or Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain, Jerusalem.
+Default weekend is Sat/Sun, or Fri/Sat for Dhaka and other Fri/Sat countries.
 Prayer locations: Dhaka, London, New York, Karachi, Makkah, Dubai, Singapore.
 No slots found is a successful search (exit 0); invalid input exits 1.
 `)

@@ -25,6 +25,10 @@ describe('shared transport parser (browser-safe, no scheduling)', () => {
   it.each(['1.5', '1e2', '-5', 'NaN', '', '9007199254740993'])('rejects non-strict integer %j', value => {
     expect(() => parseIntegerOption(value, 'days', 5)).toThrow(ScheduleInputError);
   });
+  it('parses per-zone holiday lists, including none', () => {
+    const input = parseScheduleInput({ zones: 'Asia/Dhaka,Europe/London', date: '2026-12-14', holiday: ['Asia/Dhaka=2026-12-16, 2026-12-25', 'Europe/London=2026-12-25', 'Europe/London=none'] });
+    expect(input.zones.map(zone => zone.holidays)).toEqual([['2026-12-16', '2026-12-25'], []]);
+  });
   it('reports unknown zone values and exact schema paths', () => {
     try { parseScheduleInput({ zones: 'UTC,Asia/Dhka', date: '2026-11-02' }); }
     catch (error) {
@@ -40,6 +44,8 @@ describe('shared transport parser (browser-safe, no scheduling)', () => {
     [{ zones: 'UTC', date: '2026-11-02', zoneWork: ['Europe/London=09:00-17:00'] }, 'not a selected zone'],
     [{ zones: 'UTC', date: '2026-11-02', weekend: ['UTC=funday'] }, 'Unknown weekend day'],
     [{ zones: 'UTC', date: '2026-11-02', weekend: ['UTC=mon,1'] }, 'unique'],
+    [{ zones: 'UTC', date: '2026-11-02', holiday: ['UTC=2026-12-32'] }, 'calendar date'],
+    [{ zones: 'UTC', date: '2026-11-02', holiday: ['Asia/Dhaka=2026-12-16'] }, 'not a selected zone'],
     [{ zones: 'UTC', date: '2026-11-02', prayerMethod: 'Karachi' }, 'required'],
     [{ zones: 'UTC', date: '2026-11-02', prayerLocation: 'a,b' }, 'latitude,longitude'],
     [{ zones: 'UTC', date: '2026-11-02', prayerLocation: '91,0' }, '90']

@@ -13,6 +13,7 @@ export interface CliFlags {
   work?: string;
   zoneWork?: string[];
   weekend?: string[];
+  holiday?: string[];
   quiet?: string;
   prayerBuffer?: string;
   prayerLocation?: string;

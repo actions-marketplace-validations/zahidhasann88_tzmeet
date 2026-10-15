@@ -67,6 +67,14 @@ describe('shareable and persistent state', () => {
     expect(initials('Dhaka')).toBe('DH');
     expect(initials('UTC')).toBe('UT');
   });
+
+  it('colours holiday dates on the timeline', () => {
+    const input = parseState({ ...defaultState(), input: { zones: [{ ...regionalZone('Asia/Dhaka'), holidays: ['2026-12-16'] }], startDate: '2026-12-16' } }).input;
+    // 00:00 UTC is 06:00 on the 16th in Dhaka; the holiday covers the rest of the UTC day.
+    const kinds = makeTimeline(input, '2026-12-16')[0]!.segments.map(segment => segment.kind);
+    expect(kinds).toContain('holiday');
+    expect(kinds).not.toContain('work');
+  });
 });
 
 describe('invite and calendar exports', () => {

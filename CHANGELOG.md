@@ -4,6 +4,14 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Per-zone holidays: list local dates (`holidays: ['2026-12-16']`, `--holiday Asia/Dhaka=2026-12-16`, `?holiday=…`) and they block those days like a weekend. Diagnostics report `holiday` as its own constraint, and the web timeline shows holidays in their own pattern.
+- Overnight windows: work and allowed hours can run past midnight (e.g. work 22:00–06:00 inside 20:00–08:00) for night shifts. Daytime schedules behave exactly as before.
+- Fri/Sat weekend defaults for Egypt, Jordan, Oman, Iraq, Algeria, Yemen, Sudan, Libya, Syria and the Maldives.
+- "Copy link" on each web result opens the workspace with that slot selected and in view.
+- Dependabot updates for npm packages, GitHub Actions and the API's Docker base image.
+
 ## [0.1.0] - 2026-10-15
 
 Initial release. The CLI is published to npm as `tzmeet`; the web app is live on GitHub Pages.

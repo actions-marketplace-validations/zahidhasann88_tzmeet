@@ -61,6 +61,7 @@ Useful flags:
 - `--days 5` sets how many days to search, and `--top 10` how many results to show.
 - `--work 09:00-18:00` sets work hours for everyone. `--zone-work America/New_York=08:00-17:00` overrides one zone.
 - `--quiet 08:00-21:00` sets the earliest and latest acceptable times.
+- `--holiday Asia/Dhaka=2026-12-16,2026-12-25` blocks those local dates for one zone.
 - `--weekend Europe/London=none` sets one zone's weekend. Dhaka and other Fri/Sat regions already default to Fri/Sat.
 - `--prayer-location Dhaka --prayer-method Karachi --prayer-buffer 10` turns on prayer times.
 - `--json` prints machine-readable output. `--config path` loads a config file.
@@ -114,7 +115,7 @@ if (result.slots.length === 0) {
 }
 ```
 
-Defaults are 09:00–18:00 work hours, 08:00–21:00 quiet hours, a Sat/Sun weekend (`[6, 7]`, ISO weekdays; Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem default to Fri/Sat `[5, 6]`), 5 days, 30-minute meetings and a 15-minute step.
+Defaults are 09:00–18:00 work hours, 08:00–21:00 quiet hours, a Sat/Sun weekend (`[6, 7]`, ISO weekdays), 5 days, 30-minute meetings and a 15-minute step. Countries with a Friday/Saturday weekend default to `[5, 6]` instead: Bangladesh, Saudi Arabia, Qatar, Kuwait, Bahrain, Israel, Egypt, Jordan, Oman, Iraq, Algeria, Yemen, Sudan, Libya, Syria and the Maldives.
 
 Other exports include `validateInput()`, `listTimeZones()`, `convertTime()`, `getPrayerWindows()`, `classifySpan()`, and the zod schemas (`findSlotsSchema`, `configSchema`) used by the CLI, web app and API. See [packages/core/README.md](packages/core/README.md).
 
@@ -125,11 +126,11 @@ Other exports include `validateInput()`, `listTimeZones()`, `convertTime()`, `ge
 3. For each zone, the whole meeting is checked, not just its start. A slot that crosses midnight, a work-hour boundary or a DST change is judged by its whole span. Each zone's verdict is one of:
    - **ideal**: entirely inside work hours
    - **acceptable**: outside work hours but inside quiet hours (e.g. 08:00–09:00 or 18:00–21:00)
-   - **blocked**: falls on a weekend, before/after quiet hours, or overlaps a prayer time ± buffer
+   - **blocked**: falls on a weekend or a listed holiday, before/after quiet hours, or overlaps a prayer time ± buffer
 4. A slot is returned only if **no zone is blocked**.
 5. Score = 2 per ideal zone + 1 per acceptable zone, plus a small tie-break (at most 0.09) that prefers earlier slots and times near the middle of the first zone's work day. Results are sorted by score.
 
-Boundaries are inclusive: a meeting ending exactly at 18:00 is still ideal.
+Boundaries are inclusive: a meeting ending exactly at 18:00 is still ideal. Windows can run past midnight for night shifts: work `22:00`–`06:00` inside allowed `20:00`–`08:00` is valid. Weekends and holidays still apply per local calendar day.
 
 If nothing fits, the result explains which constraint rejected the most candidates and suggests what to relax.
 
@@ -153,7 +154,7 @@ pnpm --filter @tzmeet/api start     # http://localhost:3000, interactive docs at
 | Endpoint | Description |
 | --- | --- |
 | `POST /v1/slots` | Body is the same input as `findSlots()`. Add `?top=10&format=json\|text\|ics`. |
-| `GET /v1/slots` | Same search via query params, using the CLI flag syntax. |
+| `GET /v1/slots` | Same search via query params, using the CLI flag syntax (e.g. `&holiday=Asia/Dhaka=2026-12-16`). |
 | `GET /v1/zones?search=dhaka` | Time zone search with current UTC offsets. |
 | `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a local time. |
 | `GET /v1/health` | Health check. |
@@ -218,7 +219,7 @@ API keys, CORS, rate limiting and caching are configured with environment variab
 ## Known limitations
 
 - Prayer times are calculated astronomically and are approximate. They are not a substitute for a local mosque timetable, and Ramadan adjustments aren't applied.
-- Work hours can't span midnight, and holidays or existing calendar events aren't considered.
+- Holidays have to be listed per zone; there's no built-in holiday calendar, and existing calendar events aren't considered.
 - Time zone rules come from the Node/browser runtime, so keep it up to date.
 - Searches in the web app run on the main thread; very large ranges can feel slow on low-end phones.
 

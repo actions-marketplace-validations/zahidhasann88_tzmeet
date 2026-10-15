@@ -50,6 +50,21 @@ test('add/search/reorder zones, pick date, see results, and round-trip exact URL
   expect(errors).toEqual([]);
 });
 
+test('copies a link that opens one exact slot', async ({ page, context }) => {
+  await mockClipboard(page);
+  await open(page);
+  const third = page.locator('.slot-card').nth(2);
+  const start = (await third.getAttribute('id'))!;
+  await page.getByRole('button', { name: 'Copy link to slot 3', exact: true }).click();
+  const link = await page.evaluate(() => document.documentElement.dataset.clipboard!);
+  const opened = await context.newPage();
+  await opened.goto(link);
+  const card = opened.locator(`[id="${start}"]`);
+  await expect(card).toHaveClass(/selected/);
+  await expect(card.locator('.slot-details')).toBeVisible();
+  await expect(card).toBeInViewport();
+});
+
 test('copies every local time and downloads a real UTC ICS file', async ({ page }) => {
   await mockClipboard(page);
   await open(page);

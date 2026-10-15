@@ -102,7 +102,8 @@ function ZoneSettings({ state, setState }: { state: WebState; setState: StateSet
             <div className="field-pair"><label>Work starts<input type="time" aria-label={`${zone.label} work starts`} value={zone.workStart} onChange={event => change(index, { workStart: event.target.value })} /></label><label>Work ends<input type="time" aria-label={`${zone.label} work ends`} value={zone.workEnd} onChange={event => change(index, { workEnd: event.target.value })} /></label></div>
             <div className="field-pair"><label>Earliest allowed<input type="time" aria-label={`${zone.label} earliest allowed`} value={zone.quietBefore} onChange={event => change(index, { quietBefore: event.target.value })} /></label><label>Latest allowed<input type="time" aria-label={`${zone.label} latest allowed`} value={zone.quietAfter} onChange={event => change(index, { quietAfter: event.target.value })} /></label></div>
             <fieldset className="weekday-field"><legend>Weekend days</legend><div className="weekday-options">{dayNames.map((name, day) => <label key={name}><input type="checkbox" aria-label={`${zone.label} ${name} weekend`} checked={zone.weekend.includes(day + 1)} onChange={event => change(index, { weekend: event.target.checked ? [...zone.weekend, day + 1].sort() : zone.weekend.filter(value => value !== day + 1) })} /><span>{name}</span></label>)}</div></fieldset>
-            <p className="detail-hint">Work must fit within allowed hours. Overnight schedules are not supported.</p>
+            <HolidayField zone={zone} onChange={holidays => change(index, { holidays })} />
+            <p className="detail-hint">Work must fit within allowed hours. For night shifts, set a start later than the end (e.g. 22:00–06:00).</p>
             {zone.prayer && <p className="detail-hint">This shared workspace has a per-zone prayer override from its config. The global toggle does not remove that override.</p>}
           </div>}
         </div>;
@@ -111,6 +112,16 @@ function ZoneSettings({ state, setState }: { state: WebState; setState: StateSet
     <button className="add-zone-button" aria-expanded={picker} aria-controls="zone-picker" disabled={zones.length >= 20} onClick={() => setPicker(!picker)}><Icon name="plus" />Add a time zone<span>{zones.length}/20</span></button>
     {picker && <div id="zone-picker" className="zone-picker"><label htmlFor="zone-search">Search time zones</label><div className="search-field"><Icon name="search" /><input autoFocus id="zone-search" placeholder="Try Tokyo, Sydney, Los Angeles…" value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && results[0]) { event.preventDefault(); add(results[0]); } if (event.key === 'Escape') setPicker(false); }} /></div><ul aria-label="Matching time zones">{results.map(id => <li key={id}><button aria-label={`Add ${friendlyName(id)} (${id})`} onClick={() => add(id)}><span><strong>{friendlyName(id)}</strong><small>{id}</small></span><Icon name="plus" /></button></li>)}</ul>{!results.length && <p className="detail-hint">No available zones match your search.</p>}</div>}
   </section>;
+}
+
+/** Free-text date list kept as a local draft so typing separators isn't fought by the parsed value. */
+function HolidayField({ zone, onChange }: { zone: NormalizedInput['zones'][number]; onChange: (holidays: string[] | undefined) => void }) {
+  const [draft, setDraft] = useState((zone.holidays ?? []).join(', '));
+  return <label>Holidays<input aria-label={`${zone.label} holidays`} placeholder="2026-12-16, 2026-12-25" value={draft} onChange={event => {
+    setDraft(event.target.value);
+    const dates = event.target.value.split(/[s,]+/).filter(Boolean);
+    onChange(dates.length ? dates : undefined);
+  }} /><span className="detail-hint">Local dates (YYYY-MM-DD) treated like weekend days.</span></label>;
 }
 
 function MeetingSettings({ state, setState }: { state: WebState; setState: StateSetter }) {
@@ -151,11 +162,20 @@ function WorkspaceResults({ state, setState, copy, notify }: { state: WebState; 
   }, [checked, state.day]);
   const dayStart = DateTime.fromISO(state.day, { zone: 'UTC' }).startOf('day');
   const candidates = result?.slots.filter(slot => DateTime.fromISO(slot.start, { zone: 'UTC' }).toISODate() === state.day) ?? [];
+  // A slot link opened fresh scrolls straight to that slot. Runs before App rewrites the URL, so plain visits are unaffected.
+  useEffect(() => {
+    if (state.selected && new URLSearchParams(window.location.search).has('state')) document.getElementById(`slot-${state.selected}`)?.scrollIntoView({ block: 'center' });
+  }, []); // first render only
+  /** URL that opens this exact workspace with one slot selected, expanded and visible. */
+  function slotLink(slot: Slot, index: number) {
+    const focused = { ...state, selected: slot.start, expanded: slot.start, day: DateTime.fromISO(slot.start, { zone: 'UTC' }).toISODate()!, shown: Math.max(state.shown, Math.ceil((index + 1) / 10) * 10) };
+    return `${window.location.origin}${window.location.pathname}?${encodeState(focused)}`;
+  }
   function choose(slot: Slot) { setState({ ...state, selected: slot.start, expanded: state.expanded === slot.start ? null : slot.start, day: DateTime.fromISO(slot.start, { zone: 'UTC' }).toISODate()! }); }
   return <div className="results-workspace">
     <section className="timeline-panel" aria-labelledby="timeline-heading">
       <div className="timeline-heading"><div><p className="eyebrow">THE SHARED PICTURE</p><h2 id="timeline-heading">One day. Every timezone.</h2></div><label className="timeline-date"><span className="sr-only">Timeline UTC date</span><input type="date" aria-label="Timeline UTC date" value={state.day} onChange={event => { if (event.target.value) setState({ ...state, day: event.target.value }); }} /></label></div>
-      <div className="timeline-legend">{[['work', 'Work hours'], ['acceptable', 'Acceptable'], ['quiet', 'Quiet hours'], ['weekend', 'Weekend'], ['prayer', 'Prayer']].map(([kind, label]) => <span key={kind}><i className={`legend-dot kind-${kind}`} />{label}</span>)}<span><i className="legend-slot" />Meeting slot</span></div>
+      <div className="timeline-legend">{[['work', 'Work hours'], ['acceptable', 'Acceptable'], ['quiet', 'Quiet hours'], ['weekend', 'Weekend'], ['holiday', 'Holiday'], ['prayer', 'Prayer']].map(([kind, label]) => <span key={kind}><i className={`legend-dot kind-${kind}`} />{label}</span>)}<span><i className="legend-slot" />Meeting slot</span></div>
       {timeline.error && <p role="alert" className="error-box">{timeline.error}</p>}
       <div className="timeline-scroll" tabIndex={0} role="region" aria-label="24-hour timeline, horizontally scrollable on small screens">
         <div className="timeline-grid">
@@ -182,7 +202,7 @@ function WorkspaceResults({ state, setState, copy, notify }: { state: WebState; 
         <div className="slot-times">{slot.zones.map(zone => <div key={zone.id}><span className="slot-city">{zone.label}</span><strong>{clock(zone.localStart).toFormat('HH:mm')}<span>–{clock(zone.localEnd).toFormat('HH:mm')}</span></strong><div><small>{clock(zone.localStart).toFormat('ccc d LLL')}</small><span className={`badge badge-${zone.classification}`}>{zone.classification === 'ideal' ? 'Ideal' : 'Acceptable'}</span></div></div>)}</div>
         <p className="slot-reason">{slot.reason}</p>
         {state.expanded === slot.start && <div className="slot-details"><p><strong>Exact UTC interval</strong><br />{slot.start} → {slot.end}</p><ul>{slot.zones.map(zone => <li key={zone.id}><strong>{zone.label}</strong><span>{zone.formattedStart} → {zone.formattedEnd}</span><code>{zone.localStart} → {zone.localEnd}</code></li>)}</ul><p>Score {slot.score.toFixed(4)} = {slot.baseScore} classification points + bounded tie-break. Meeting duration is elapsed time, even across DST.</p></div>}
-        <div className="slot-actions"><button onClick={() => { void copy(inviteText(slot), 'Invite text copied with every team’s local time.'); }} aria-label={`Copy invite text for slot ${index + 1}`}><Icon name="copy" />Copy invite text</button><button onClick={() => { try { downloadCalendar(slot); notify('Calendar file downloaded. Times are stored as exact UTC instants.'); } catch { notify('The calendar download could not be created in this browser.'); } }} aria-label={`Download ICS for slot ${index + 1}`}><Icon name="download" />Download .ics</button><button className="view-timeline" onClick={() => choose(slot)}>On timeline<Icon name="arrow" /></button></div>
+        <div className="slot-actions"><button onClick={() => { void copy(inviteText(slot), 'Invite text copied with every team’s local time.'); }} aria-label={`Copy invite text for slot ${index + 1}`}><Icon name="copy" />Copy invite text</button><button onClick={() => { try { downloadCalendar(slot); notify('Calendar file downloaded. Times are stored as exact UTC instants.'); } catch { notify('The calendar download could not be created in this browser.'); } }} aria-label={`Download ICS for slot ${index + 1}`}><Icon name="download" />Download .ics</button><button onClick={() => { void copy(slotLink(slot, index), 'Link copied. It opens this exact meeting time.'); }} aria-label={`Copy link to slot ${index + 1}`}><Icon name="link" />Copy link</button><button className="view-timeline" onClick={() => choose(slot)}>On timeline<Icon name="arrow" /></button></div>
       </article>)}</div>
       {result && result.slots.length > state.shown && state.shown < 1000 && <button className="button button-outline show-more" onClick={() => setState({ ...state, shown: Math.min(1000, state.shown + 10) })}>Show 10 more of {result.slots.length} slots<Icon name="down" /></button>}
       {result && result.slots.length > 1000 && state.shown === 1000 && <p className="result-disclaimer">Showing the first 1,000 slots. Narrow the date range for a shorter list.</p>}

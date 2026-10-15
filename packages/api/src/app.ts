@@ -122,7 +122,7 @@ export function createApp(options: AppOptions = {}) {
   });
   app.openapi(getSlots, c => {
     const query = c.req.valid('query');
-    const input = parseScheduleInput({ ...query, zoneWork: array(query.zoneWork), weekend: array(query.weekend) });
+    const input = parseScheduleInput({ ...query, zoneWork: array(query.zoneWork), weekend: array(query.weekend), holiday: array(query.holiday) });
     const result = slots(input, query.top);
     const at = now().getTime();
     if (!options.apiKeys?.length && (Date.parse(result.range.end) <= at || Date.parse(result.range.start) > at)) c.header('Cache-Control', 'public, max-age=30');

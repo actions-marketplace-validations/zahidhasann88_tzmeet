@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { classifySpan, configSchema, findSlots, getPrayerWindows, InputValidationError, listTimeZones, validateInput, type ZoneRule } from '../src/index.js';
+import { classifySpan, configSchema, defaultWeekend, findSlots, getPrayerWindows, InputValidationError, listTimeZones, validateInput, type ZoneRule } from '../src/index.js';
 
 const trio: ZoneRule[] = [
   { id: 'Asia/Dhaka', label: 'Dhaka', weekend: [5, 6], quietBefore: '00:00', quietAfter: '23:59' },
@@ -201,7 +201,8 @@ describe('shared validation and time-zone discovery', () => {
     [{ zones: [{ id: 'Mars/Olympus' }], startDate: '2026-11-02' }, 'Unknown IANA'],
     [{ zones: [{ id: 'UTC', workStart: '9:00' }], startDate: '2026-11-02' }, 'HH:mm'],
     [{ zones: [{ id: 'UTC', quietAfter: '24:00' }], startDate: '2026-11-02' }, 'HH:mm'],
-    [{ zones: [{ id: 'UTC', workEnd: '08:00' }], startDate: '2026-11-02' }, 'after workStart'],
+    [{ zones: [{ id: 'UTC', workEnd: '08:00' }], startDate: '2026-11-02' }, 'fit inside'], // overnight 09:00–08:00 exceeds 08:00–21:00
+    [{ zones: [{ id: 'UTC', workEnd: '09:00' }], startDate: '2026-11-02' }, 'differ'],
     [{ zones: [{ id: 'UTC', quietBefore: '10:00' }], startDate: '2026-11-02' }, 'fit inside'],
     [{ zones: [{ id: 'UTC' }], startDate: '2026-02-30' }, 'calendar date'],
     [{ zones: [{ id: 'UTC' }], startDate: '2026-11-02', stepMinutes: 0 }, 'greater than'],
@@ -224,6 +225,8 @@ describe('shared validation and time-zone discovery', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.zones.map(zone => zone.weekend)).toEqual([[5, 6], [6, 7], [], [7]]);
+      expect(['Africa/Cairo', 'Asia/Muscat', 'Indian/Maldives'].map(defaultWeekend)).toEqual([[5, 6], [5, 6], [5, 6]]);
+      expect(['Asia/Dubai', 'Asia/Tehran', 'Asia/Karachi'].map(defaultWeekend)).toEqual([[6, 7], [6, 7], [6, 7]]);
       expect(result.data.days).toBe(5);
       expect(result.data.durationMinutes).toBe(30);
       expect(result.data.stepMinutes).toBe(15);
@@ -243,5 +246,70 @@ describe('shared validation and time-zone discovery', () => {
 
   it('requires unambiguous ISO instants for independent span evaluation', () => {
     expect(() => classifySpan(openNY, '2026-11-01T01:30:00', '2026-11-01T02:00:00')).toThrow(/offset/);
+  });
+});
+
+describe('holidays', () => {
+  const pair: ZoneRule[] = [{ id: 'Asia/Dhaka', label: 'Dhaka' }, { id: 'Europe/London', label: 'London' }];
+
+  it('blocks the whole local holiday date and explains it when nothing fits', () => {
+    // Wednesday 16 Dec 2026, Victory Day in Bangladesh.
+    const zones: ZoneRule[] = [{ ...pair[0]!, holidays: ['2026-12-16'] }, pair[1]!];
+    const result = findSlots({ zones, startDate: '2026-12-16', days: 1 });
+    expect(result.slots).toEqual([]);
+    expect(result.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
+    expect(result.diagnostics.suggestion).toContain('holiday in Dhaka');
+  });
+
+  it('only blocks the listed dates, judged in that zone', () => {
+    const zones: ZoneRule[] = [{ ...pair[0]!, holidays: ['2026-12-16'] }, pair[1]!];
+    const result = findSlots({ zones, startDate: '2026-12-15', days: 3 });
+    expect(new Set(result.slots.map(slot => slot.zones[0]!.localStart.slice(0, 10)))).toEqual(new Set(['2026-12-15', '2026-12-17']));
+    expect(classifySpan(zones[0]!, '2026-12-15T17:45:00Z', '2026-12-15T18:15:00Z').constraints).toContain('holiday'); // crosses Dhaka midnight into the 16th
+  });
+
+  it('validates holiday dates', () => {
+    for (const holidays of [['2026-13-01'], ['16-12-2026'], ['2026-12-16', '2026-12-16']]) {
+      expect(validateInput({ zones: [{ id: 'UTC', holidays }], startDate: '2026-12-15' }).success).toBe(false);
+    }
+  });
+});
+
+describe('overnight windows', () => {
+  const night: ZoneRule = { id: 'UTC', weekend: [], workStart: '22:00', workEnd: '06:00', quietBefore: '20:00', quietAfter: '08:00' };
+
+  it('accepts work and allowed hours that run past midnight', () => {
+    expect(validateInput({ zones: [night], startDate: '2026-11-02' }).success).toBe(true);
+    // Overnight work must still sit inside the allowed window.
+    expect(validateInput({ zones: [{ ...night, workStart: '19:00' }], startDate: '2026-11-02' }).success).toBe(false);
+    expect(validateInput({ zones: [{ ...night, quietBefore: '08:00', quietAfter: '21:00' }], startDate: '2026-11-02' }).success).toBe(false);
+  });
+
+  it('classifies a night shift across midnight, including the end boundary', () => {
+    expect(classifySpan(night, '2026-11-02T23:30:00Z', '2026-11-03T00:30:00Z').classification).toBe('ideal');
+    expect(classifySpan(night, '2026-11-03T05:30:00Z', '2026-11-03T06:00:00Z').classification).toBe('ideal');
+    expect(classifySpan(night, '2026-11-02T21:00:00Z', '2026-11-02T21:30:00Z').classification).toBe('acceptable');
+    expect(classifySpan(night, '2026-11-02T12:00:00Z', '2026-11-02T12:30:00Z').constraints).toContain('quiet');
+  });
+
+  it('ranks night-shift slots and describes pre-shift time as before work', () => {
+    const result = findSlots({ zones: [night], startDate: '2026-11-02', days: 1, stepMinutes: 30 });
+    const top = result.slots[0]!;
+    expect(top.zones[0]!.classification).toBe('ideal');
+    // Midpoint of 22:00–06:00 is 02:00; the best-scored slot sits near it.
+    expect(Math.abs(DateTime.fromISO(top.start, { zone: 'UTC' }).hour - 2)).toBeLessThanOrEqual(1);
+    expect(result.slots.find(slot => slot.start.startsWith('2026-11-02T21:00'))!.reason).toBe('before work (acceptable) for UTC');
+  });
+
+  it('keeps a night shift paired with a London day team', () => {
+    const zones: ZoneRule[] = [{ ...night, id: 'America/New_York', label: 'NY night desk' }, { id: 'Europe/London', label: 'London' }];
+    const result = findSlots({ zones, startDate: '2026-11-03', days: 1 });
+    // London's allowed 08:00–21:00 is 03:00–16:00 in New York; it meets the night desk's 20:00–08:00 at 03:00–08:00.
+    const nyStarts = result.slots.map(slot => DateTime.fromISO(slot.zones[0]!.localStart, { setZone: true }));
+    expect(nyStarts.length).toBeGreaterThan(0);
+    expect(nyStarts.every(time => time.hour >= 3 && time.hour < 8)).toBe(true);
+    // 03:00–06:00 is inside the night shift, so the top pick is ideal for both teams.
+    expect(result.slots[0]!.zones.map(zone => zone.classification)).toEqual(['ideal', 'ideal']);
+    expect(result.slots.some(slot => slot.zones[0]!.classification === 'acceptable')).toBe(true);
   });
 });

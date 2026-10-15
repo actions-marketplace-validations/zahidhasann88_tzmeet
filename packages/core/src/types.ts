@@ -1,7 +1,7 @@
 /** Full-span classification; blocked slots are never included in search results. */
 export type Classification = 'ideal' | 'acceptable' | 'blocked';
 /** Independent rejection causes (a candidate may violate more than one). */
-export type Constraint = 'weekend' | 'quiet' | 'prayer';
+export type Constraint = 'weekend' | 'holiday' | 'quiet' | 'prayer';
 
 /** Local meeting span with offsets preserved, including repeated DST hours. */
 export interface ZoneSlot {

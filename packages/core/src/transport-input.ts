@@ -10,6 +10,8 @@ export interface ScheduleTextOptions {
   work?: string;
   zoneWork?: readonly string[];
   weekend?: readonly string[];
+  /** Repeatable `IANA_ZONE=YYYY-MM-DD,YYYY-MM-DD` (or `=none`) holiday lists. */
+  holiday?: readonly string[];
   quiet?: string;
   prayerBuffer?: string;
   prayerLocation?: string;
@@ -103,6 +105,10 @@ export function parseScheduleInput(options: ScheduleTextOptions, config: unknown
   for (const override of options.weekend ?? []) {
     const { zone, value } = assignment(override, 'weekend', zones);
     zone.weekend = weekends(value);
+  }
+  for (const override of options.holiday ?? []) {
+    const { zone, value } = assignment(override, 'holiday', zones);
+    zone.holidays = value === '' || value.toLowerCase() === 'none' ? [] : value.split(',').map(date => date.trim());
   }
   let prayer: unknown = defaults.prayer;
   if ([options.prayerLocation, options.prayerMethod, options.prayerBuffer].some(value => value !== undefined)) {

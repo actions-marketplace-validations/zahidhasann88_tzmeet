@@ -1,11 +1,13 @@
 import { DateTime } from 'luxon';
-import { findSlotsSchema, validateInput, zoneSchema, type FindSlotsInput, type NormalizedInput, type PrayerRule, type ZoneRule } from './schema.js';
+import { findSlotsSchema, minutesAhead, validateInput, zoneSchema, type FindSlotsInput, type NormalizedInput, type PrayerRule, type ZoneRule } from './schema.js';
 import { getPrayerWindows } from './prayer.js';
 import type { Constraint, ConstraintCount, Diagnostics, FindSlotsResult, Slot, SpanEvaluation, ZoneSlot } from './types.js';
 
 type NormalZone = NormalizedInput['zones'][number];
 const isoDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const toMinutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+/** Inclusive clock window; a start later than the end runs past midnight (e.g. 22:00–06:00). */
+const inWindow = (minute: number, start: number, end: number) => start <= end ? minute >= start && minute <= end : minute >= start || minute <= end;
 const nameOf = (zone: NormalZone) => zone.label ?? zone.id.split('/').at(-1)!.replaceAll('_', ' ');
 
 /** Invalid input with readable, path-specific errors; no Node-specific error types. */
@@ -31,6 +33,7 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput['prayer']) {
   const workEnd = toMinutes(zone.workEnd);
   const quietBefore = toMinutes(zone.quietBefore);
   const quietAfter = toMinutes(zone.quietAfter);
+  const holidays = new Set(zone.holidays ?? []);
 
   function boundaries(day: DateTime): number[] {
     const key = day.toISODate()!;
@@ -106,8 +109,9 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput['prayer']) {
       const local = DateTime.fromMillis(instant, { zone: zone.id });
       const minute = local.hour * 60 + local.minute + local.second / 60 + local.millisecond / 60000;
       if (zone.weekend.includes(local.weekday)) constraints.add('weekend');
-      if (minute < quietBefore || minute > quietAfter) constraints.add('quiet');
-      if (minute < workStart || minute > workEnd) ideal = false;
+      if (holidays.size && holidays.has(local.toISODate()!)) constraints.add('holiday');
+      if (!inWindow(minute, quietBefore, quietAfter)) constraints.add('quiet');
+      if (!inWindow(minute, workStart, workEnd)) ideal = false;
     }
     return { classification: constraints.size ? 'blocked' : ideal ? 'ideal' : 'acceptable', constraints: [...constraints], prayers: [...prayers] };
   };
@@ -142,8 +146,12 @@ function humanReason(zones: ZoneSlot[], input: NormalizedInput): string {
     const rule = input.zones.find(rule => rule.id === zone.id)!;
     const start = DateTime.fromISO(zone.localStart, { setZone: true });
     const end = DateTime.fromISO(zone.localEnd, { setZone: true });
-    const kind = start.hour * 60 + start.minute < toMinutes(rule.workStart)
-      ? end.hour * 60 + end.minute > toMinutes(rule.workEnd) ? 'outside work hours' : 'early morning'
+    // Acceptable spans lie inside the allowed window, so measure clockwise from its start.
+    const from = toMinutes(rule.quietBefore);
+    const offset = (time: DateTime) => minutesAhead(from, time.hour * 60 + time.minute);
+    const overnight = rule.workStart > rule.workEnd;
+    const kind = offset(start) < minutesAhead(from, toMinutes(rule.workStart))
+      ? offset(end) > minutesAhead(from, toMinutes(rule.workEnd)) ? 'outside work hours' : overnight ? 'before work' : 'early morning'
       : 'after work';
     return `${kind} (acceptable) for ${zone.label}`;
   });
@@ -161,6 +169,7 @@ function diagnostics(input: NormalizedInput, scanned: number, rejected: number, 
   const suggestion = !most ? 'Try a longer date range or a shorter meeting duration.'
     : most.constraint === 'quiet' ? `Relax the early/late quiet-hour cutoff for ${most.label}, shorten the meeting, or try a different week.`
       : most.constraint === 'weekend' ? 'Try a different week or change weekend days only where the team agrees.'
+        : most.constraint === 'holiday' ? `A holiday in ${most.label} blocks part of this range. Try a different week, or remove that date if people are working.`
         : `Reduce the prayer buffer for ${most.label} if appropriate, or try another time/date.`;
   const dominant = most ? `The largest rejection count was ${most.constraint} in ${most.label} (${most.count} of ${scanned} candidates).` : 'No full meeting fits inside the requested date range.';
   return {
@@ -177,8 +186,9 @@ function diagnostics(input: NormalizedInput, scanned: number, rejected: number, 
  * Scan UTC starts from first-zone local midnight, at stepMinutes increments.
  * Only whole meetings contained in the calendar-day range are considered.
  * Classify all pieces separated by local midnight, window boundaries and DST
- * changes; block on any weekend, quiet-hour violation, or prayer overlap.
- * Score = sum(ideal:2, acceptable:1) + 0.06*earliness + 0.03*work-midpoint proximity.
+ * changes; block on any weekend or holiday, quiet-hour violation, or prayer overlap.
+ * Score = sum(ideal:2, acceptable:1) + 0.06*earliness + 0.03*work-midpoint proximity
+ * (measured around the clock when the first zone's work hours run overnight).
  * This bounded tie-break can never outweigh a classification point.
  */
 export function findSlots(input: FindSlotsInput): FindSlotsResult {
@@ -188,6 +198,10 @@ export function findSlots(input: FindSlotsInput): FindSlotsResult {
   const rangeStart = localRangeStart.toUTC();
   const rangeEnd = localRangeStart.plus({ days: normalized.days }).startOf('day').toUTC();
   const evaluations = normalized.zones.map(zone => evaluator(zone, normalized.prayer));
+  const firstWorkStart = toMinutes(first.workStart);
+  const firstWorkEnd = toMinutes(first.workEnd);
+  const overnightWork = firstWorkStart > firstWorkEnd;
+  const workMiddle = overnightWork ? (firstWorkStart + minutesAhead(firstWorkStart, firstWorkEnd) / 2) % 1440 : (firstWorkStart + firstWorkEnd) / 2;
   const slots: Slot[] = [];
   const counts = new Map<string, ConstraintCount>();
   let scanned = 0;
@@ -222,8 +236,8 @@ export function findSlots(input: FindSlotsInput): FindSlotsResult {
     const baseScore = zones.reduce((score, zone) => score + (zone.classification === 'ideal' ? 2 : 1), 0);
     const earliness = 1 - (start.toMillis() - rangeStart.toMillis()) / (rangeEnd.toMillis() - rangeStart.toMillis());
     const localMiddle = start.plus({ minutes: normalized.durationMinutes / 2 }).setZone(first.id);
-    const workMiddle = (toMinutes(first.workStart) + toMinutes(first.workEnd)) / 2;
-    const proximity = Math.max(0, 1 - Math.abs(localMiddle.hour * 60 + localMiddle.minute + localMiddle.second / 60 - workMiddle) / 720);
+    const offWork = Math.abs(localMiddle.hour * 60 + localMiddle.minute + localMiddle.second / 60 - workMiddle);
+    const proximity = Math.max(0, 1 - (overnightWork ? Math.min(offWork, 1440 - offWork) : offWork) / 720);
     slots.push({ start: start.toISO()!, end: end.toISO()!, date: start.setZone(first.id).toISODate()!, baseScore, score: baseScore + 0.06 * earliness + 0.03 * proximity, zones, reason: humanReason(zones, normalized) });
   }
   slots.sort((a, b) => b.score - a.score || a.start.localeCompare(b.start));

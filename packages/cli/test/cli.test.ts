@@ -181,6 +181,15 @@ describe('configuration discovery and precedence', () => {
   });
 });
 
+describe('holiday CLI option', () => {
+  it('blocks a zone holiday and reports it as the cause', () => {
+    const result = json(['--zones', 'Asia/Dhaka,Europe/London', '--date', '2026-12-16', '--days', '1', '--holiday', 'Asia/Dhaka=2026-12-16']);
+    expect(result.slots).toEqual([]);
+    expect(result.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
+    expect(json(['--zones', 'Asia/Dhaka,Europe/London', '--date', '2026-12-16', '--days', '1']).slots.length).toBeGreaterThan(0);
+  });
+});
+
 describe('prayer CLI options', () => {
   it('enables prayer constraints with a built-in city and defaults', () => {
     const result = json(['--zones', 'Asia/Dhaka', '--date', '2026-11-02', '--days', '1', '--prayer-location', 'Dhaka']);

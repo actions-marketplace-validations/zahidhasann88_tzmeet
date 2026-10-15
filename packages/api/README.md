@@ -30,7 +30,7 @@ const response = await app.request('/v1/health');
 | Method | Path | Input/result |
 | --- | --- | --- |
 | POST | `/v1/slots` | Core `FindSlotsInput` JSON, including global/per-zone prayer and per-zone work/weekend/quiet settings |
-| GET | `/v1/slots` | Required comma-separated `zones` and `date`; optional `duration`, `days`, `step`, `work`, repeatable `zoneWork`/`weekend`, `quiet`, `prayerBuffer`, `prayerLocation`, `prayerMethod` |
+| GET | `/v1/slots` | Required comma-separated `zones` and `date`; optional `duration`, `days`, `step`, `work`, repeatable `zoneWork`/`weekend`/`holiday`, `quiet`, `prayerBuffer`, `prayerLocation`, `prayerMethod` |
 | GET | `/v1/zones?search=dhaka` | `{zones:[{id,label,offset,offsetMinutes}]}` with current offsets |
 | GET | `/v1/convert` | Required local ISO `time`, `from`, comma-separated `to`; optional `disambiguation=reject|earlier|later` |
 | GET | `/v1/health` | `{status:"ok",version:"0.1.0"}`; public even in key mode |
@@ -39,7 +39,7 @@ const response = await app.request('/v1/health');
 
 Slots query options: `top=1..50` (default **10**), `format=json|text|ics` (default **json**). JSON returns `{slots,diagnostics,meta:{count,generatedAt,version}}`; every slot and diagnostics object is directly core output. No slots is HTTP **200**, with empty JSON/ICS or diagnostic text. Text joins the exact browser invite formatter with blank lines. ICS contains all returned/top-capped slots in **one calendar**, each `STATUS:TENTATIVE`, UTC DTSTART/DTEND, stable unique UID, escaped text and UTF-8 75-octet folding.
 
-HTTP dates are explicit; no server-today fallback. CLI flags and GET overrides use the same additive pure `core.parseScheduleInput()` helper; CLI config/today behavior remains in its Node wrapper. Defaults: 5 days, 30-minute duration, 15-minute step, 09:00–18:00 work, 08:00–21:00 allowed hours, Sat/Sun weekends except Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem (core `defaultWeekend()`).
+HTTP dates are explicit; no server-today fallback. CLI flags and GET overrides use the same additive pure `core.parseScheduleInput()` helper; CLI config/today behavior remains in its Node wrapper. Defaults: 5 days, 30-minute duration, 15-minute step, 09:00–18:00 work, 08:00–21:00 allowed hours, Sat/Sun weekends except Fri/Sat for Dhaka and other Friday/Saturday countries (core `defaultWeekend()`).
 
 ### curl examples
 

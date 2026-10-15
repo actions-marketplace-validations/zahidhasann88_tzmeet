@@ -28,8 +28,17 @@ export const prayerSchema = z.object({
   bufferMinutes: z.number().int().min(0).max(180).default(10)
 }).strict();
 
+/** Minutes since midnight for an HH:mm clock time. */
+export const clockMinutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+/** Minutes going forward from one clock minute to another, wrapping past midnight (0–1439). */
+export const minutesAhead = (from: number, to: number) => (to - from + 1440) % 1440;
+
 /** Zones whose working week is Sunday–Thursday. Every other zone defaults to a Sat/Sun weekend. */
-const fridaySaturdayZones = new Set(['Asia/Dhaka', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Kuwait', 'Asia/Bahrain', 'Asia/Jerusalem']);
+const fridaySaturdayZones = new Set([
+  'Asia/Dhaka', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Kuwait', 'Asia/Bahrain', 'Asia/Jerusalem',
+  'Africa/Cairo', 'Asia/Amman', 'Asia/Muscat', 'Asia/Baghdad', 'Africa/Algiers', 'Asia/Aden',
+  'Africa/Khartoum', 'Africa/Tripoli', 'Asia/Damascus', 'Indian/Maldives'
+]);
 
 /** Regional default weekend (ISO weekdays) used when a zone omits `weekend`: [5, 6] for Fri/Sat regions, otherwise [6, 7]. */
 export function defaultWeekend(id: string): number[] {
@@ -44,15 +53,26 @@ const zoneObject = z.object({
   weekend: z.array(z.number().int().min(1).max(7)).max(7).optional(),
   quietBefore: timeSchema.default('08:00'),
   quietAfter: timeSchema.default('21:00'),
+  /** Local dates (YYYY-MM-DD) blocked for this zone, like extra weekend days. */
+  holidays: z.array(dateSchema).max(366).optional(),
   prayer: prayerSchema.optional()
 }).strict();
 
 /** Non-overnight daily windows, with work hours contained inside allowed hours. */
 export const zoneSchema = zoneObject.superRefine((zone, ctx) => {
-  if (zone.workStart >= zone.workEnd) ctx.addIssue({ code: 'custom', path: ['workEnd'], message: 'workEnd must be after workStart (overnight work windows are not supported)' });
-  if (zone.quietBefore >= zone.quietAfter) ctx.addIssue({ code: 'custom', path: ['quietAfter'], message: 'quietAfter must be after quietBefore' });
-  if (zone.workStart < zone.quietBefore || zone.workEnd > zone.quietAfter) ctx.addIssue({ code: 'custom', path: ['workStart'], message: 'Work hours must fit inside quietBefore–quietAfter' });
+  // A window whose start is later than its end runs overnight, e.g. 22:00–06:00.
+  if (zone.workStart === zone.workEnd) ctx.addIssue({ code: 'custom', path: ['workEnd'], message: 'workEnd must differ from workStart' });
+  if (zone.quietBefore === zone.quietAfter) ctx.addIssue({ code: 'custom', path: ['quietAfter'], message: 'quietAfter must differ from quietBefore' });
+  if (zone.workStart !== zone.workEnd && zone.quietBefore !== zone.quietAfter) {
+    // Measure clockwise from the start of the allowed window so overnight windows compare correctly.
+    const from = clockMinutes(zone.quietBefore);
+    const allowed = minutesAhead(from, clockMinutes(zone.quietAfter));
+    const workStart = minutesAhead(from, clockMinutes(zone.workStart));
+    const workEnd = minutesAhead(from, clockMinutes(zone.workEnd));
+    if (workStart > allowed || workEnd > allowed || workStart >= workEnd) ctx.addIssue({ code: 'custom', path: ['workStart'], message: 'Work hours must fit inside quietBefore–quietAfter' });
+  }
   if (zone.weekend && new Set(zone.weekend).size !== zone.weekend.length) ctx.addIssue({ code: 'custom', path: ['weekend'], message: 'Weekend days must be unique' });
+  if (zone.holidays && new Set(zone.holidays).size !== zone.holidays.length) ctx.addIssue({ code: 'custom', path: ['holidays'], message: 'Holiday dates must be unique' });
 }).transform(zone => ({ ...zone, weekend: zone.weekend ?? defaultWeekend(zone.id) }));
 
 const zonesSchema = z.array(zoneSchema).min(1, 'Add at least one zone').max(20).refine(

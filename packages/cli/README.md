@@ -54,6 +54,7 @@ Tables show rank, first-zone date, each zone's **own local date, time range, UTC
 | `--work <HH:mm-HH:mm>` | Global work override, core default 09:00–18:00 |
 | `--zone-work <zone=HH:mm-HH:mm>` | Repeatable per-zone work override |
 | `--weekend <zone=fri,sat>` | Repeatable per-zone ISO weekend; default Sat/Sun, or Fri/Sat for Dhaka and other Fri/Sat regions |
+| `--holiday <zone=dates>` | Repeatable per-zone holiday dates, e.g. `Asia/Dhaka=2026-12-16,2026-12-25`, or `none` |
 | `--quiet <HH:mm-HH:mm>` | Allowed early/late window, core default 08:00–21:00 |
 | `--prayer-location <city>` | Enable common prayer instants using a city or `latitude,longitude` |
 | `--prayer-method <method>` | Karachi default; MWL and other adhan methods supported |
@@ -63,9 +64,9 @@ Tables show rank, first-zone date, each zone's **own local date, time range, UTC
 | `--json` | Machine-readable result; stdout contains only JSON |
 | `--help`, `--version` | Usage/version, exit 0 |
 
-Weekends default to Sat/Sun, except Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem. Override any zone with e.g. `--weekend Europe/London=none` or `weekend: [5, 6]` in config. Weekend flag values can be weekday abbreviations/full names (case-insensitive), ISO numbers 1–7, `none`, or an empty assignment to remove weekends. Duplicate weekdays are invalid.
+Weekends default to Sat/Sun, except Fri/Sat for Dhaka and other countries with a Friday/Saturday weekend. Override any zone with e.g. `--weekend Europe/London=none` or `weekend: [5, 6]` in config. Weekend flag values can be weekday abbreviations/full names (case-insensitive), ISO numbers 1–7, `none`, or an empty assignment to remove weekends. Duplicate weekdays are invalid.
 
-Duration/step are integer minutes, 1–1440. Work hours must be within allowed hours, and neither window may be overnight. `24:00` is not accepted. Zone-specific overrides must target a selected zone; mistyped IDs do not silently create participants.
+Duration/step are integer minutes, 1–1440. Work hours must be within allowed hours. Either window can run past midnight for night shifts, e.g. `--zone-work America/New_York=22:00-06:00 --quiet 20:00-08:00`. `24:00` is not accepted. Zone-specific overrides must target a selected zone; mistyped IDs do not silently create participants.
 
 ## Configuration and precedence
 

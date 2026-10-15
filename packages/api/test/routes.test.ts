@@ -107,6 +107,18 @@ describe('stateless JSON routes (in-process app.request only)', () => {
   });
 });
 
+describe('holidays over HTTP', () => {
+  it('accepts repeated GET holiday parameters and POST holidays, returning holiday diagnostics', async () => {
+    const get = await app.request('/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-12-16&days=1&holiday=Asia/Dhaka=2026-12-16');
+    expect(get.status).toBe(200);
+    const body = slotsResultSchema.parse(await get.json());
+    expect(body.slots).toEqual([]);
+    expect(body.diagnostics.mostRestrictive?.constraint).toBe('holiday');
+    const viaPost = await post({ zones: [{ id: 'Asia/Dhaka', holidays: ['2026-12-16'] }, { id: 'Europe/London' }], startDate: '2026-12-16', days: 1 });
+    expect(slotsResultSchema.parse(await viaPost.json()).diagnostics.mostRestrictive?.constraint).toBe('holiday');
+  });
+});
+
 describe('precise, sanitized transport errors', () => {
   it('suggests unknown zones with bracket-indexed POST fields and no duplicate prefixes', async () => {
     const error = await publicError(await post({ ...input, zones: [{ id: 'UTC' }, { id: 'Asia/Dhka' }] }));
