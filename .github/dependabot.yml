@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # One pnpm workspace lockfile covers every package and app.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Kept on zod 3 to match the @hono/zod-openapi 0.19 line; upgrade both together.
+      - dependency-name: zod
+        update-types: [version-update:semver-major]
+      - dependency-name: '@hono/zod-openapi'
+        update-types: [version-update:semver-major, version-update:semver-minor]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /packages/api
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      # Stay on the Node 22 LTS line; move to the next LTS deliberately.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
