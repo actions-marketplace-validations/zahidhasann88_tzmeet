@@ -219,11 +219,11 @@ describe('shared validation and time-zone discovery', () => {
     expect(validateInput(input).success).toBe(false);
   });
 
-  it('resolves defaults and leaves Dhaka weekend explicit at core level', () => {
-    const result = validateInput({ zones: [{ id: 'Asia/Dhaka' }], startDate: '2026-11-02' });
+  it('resolves defaults, including a regional Fri/Sat weekend for Dhaka', () => {
+    const result = validateInput({ zones: [{ id: 'Asia/Dhaka' }, { id: 'Europe/London' }, { id: 'UTC', weekend: [] }, { id: 'Asia/Riyadh', weekend: [7] }], startDate: '2026-11-02' });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.zones[0]!.weekend).toEqual([6, 7]);
+      expect(result.data.zones.map(zone => zone.weekend)).toEqual([[5, 6], [6, 7], [], [7]]);
       expect(result.data.days).toBe(5);
       expect(result.data.durationMinutes).toBe(30);
       expect(result.data.stepMinutes).toBe(15);

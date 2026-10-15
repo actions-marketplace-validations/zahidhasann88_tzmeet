@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { classifySpan, classifySpans, findSlots, type Slot } from '@tzmeet/core';
 import { calendarText, foldLine, inviteText } from '../src/invite';
-import { decodeState, defaultState, encodeState, parseState, persistState, regionalZone, restoreState, STORAGE_KEY } from '../src/state';
+import { decodeState, defaultState, encodeState, initials, parseState, persistState, regionalZone, restoreState, STORAGE_KEY } from '../src/state';
 import { makeTimeline } from '../src/timeline';
 
 function fixture(): Slot {
@@ -59,6 +59,13 @@ describe('shareable and persistent state', () => {
     expect(regionalZone('Asia/Dhaka').weekend).toEqual([5, 6]);
     expect(regionalZone('America/New_York').weekend).toEqual([6, 7]);
     expect(regionalZone('Europe/London').workStart).toBe('09:00');
+  });
+
+  it('builds avatar initials from each word of multi-word names', () => {
+    expect(initials('New York')).toBe('NY');
+    expect(initials('Los  Angeles')).toBe('LA');
+    expect(initials('Dhaka')).toBe('DH');
+    expect(initials('UTC')).toBe('UT');
   });
 });
 

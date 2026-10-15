@@ -28,27 +28,6 @@ pnpm --filter @tzmeet/web preview     # Vite preview, port 4173
 
 The core is aliased to TypeScript source, so a separate published core package is not required. The deployment artifacts include an MIT license, third-party notices, and `.nojekyll`.
 
-### GitHub Pages paths
-
-For a project site at `https://ACCOUNT.github.io/tzmeet/`:
-
-```sh
-TZMEET_BASE_PATH=/tzmeet pnpm --filter @tzmeet/web build
-# Deploy the CONTENTS of apps/web/out, not the out directory itself.
-```
-
-Use the real repository name for the base path. For an account site (`ACCOUNT.github.io`) or a custom domain mounted at `/`, leave `TZMEET_BASE_PATH` unset. It is a build-time value; rebuild when changing deployment paths.
-
-To preview a prefixed export locally:
-
-```sh
-cd apps/web
-TZMEET_STATIC_BASE=/tzmeet node scripts/serve.mjs out 4181
-# Open http://localhost:4181/tzmeet/ (root redirects there).
-```
-
-The automatic workflow is in `.github/workflows/pages.yml`. Enable Actions and set **Settings → Pages → Source: GitHub Actions**, then push/dispatch from `main`. It reads the site's real `base_path` from `actions/configure-pages`, verifies source/unit tests, builds the static export, and runs desktop/mobile checks against that exact export before uploading/deploying it. PRs do not deploy. See the root README and `docs/RELEASING.md` for permissions, branch/environment setup and custom-domain details. No hosted deployment has been performed here.
-
 ## Using the workspace
 
 1. Add zones by searching an IANA identifier or city name. Defaults are Dhaka, London, and New York. Use the up/down controls to reorder; the first zone anchors the search date range. Removing the last remaining zone is disabled.
@@ -88,20 +67,5 @@ pnpm --filter @tzmeet/web test:e2e
 ```
 
 Playwright builds the Vite static output, serves only those files, and tests both desktop Chromium and a mobile Pixel viewport. Coverage includes adding/reordering zones, date/duration selection, exact URL round-trips, theme, prayer/persistence, ICS downloads, clipboard/fallback, validation/empty states, storage denial, keyboard use, and offline/no-runtime-network behavior. Axe checks WCAG A/AA-tagged rules in light/dark themes; this is an automated check, not a complete accessibility certification.
-
-To test an already served export (including a GitHub Pages prefix):
-
-```sh
-TZMEET_E2E_URL=http://localhost:4181/tzmeet/ pnpm --filter @tzmeet/web test:e2e
-```
-
-To test a locally built project-path export exactly as the Pages workflow does:
-
-```sh
-TZMEET_BASE_PATH=/tzmeet pnpm --filter @tzmeet/web build
-TZMEET_E2E_BASE_PATH=/tzmeet TZMEET_E2E_SKIP_BUILD=1 pnpm test:e2e
-```
-
-The skip-build flag is opt-in and only serves existing files; normal browser tests always rebuild. The test server uses port 4190, separate from the manual preview's 4180. CI runs these browser tests after its Node 20/22/24 verification matrix and keeps failure traces for seven days.
 
 See the root README for the exact scoring/endpoint rules and prayer/timezone limitations. Very large ranges may take noticeable CPU time on low-powered devices; computation is currently on the main thread. Very long share URLs may exceed some hosting/browser limits; use fewer zones or shorter labels if needed.

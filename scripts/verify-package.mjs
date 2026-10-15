@@ -1,6 +1,6 @@
 // Pack and install the actual npm artifact, independent of workspace resolution.
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,10 @@ import { fileURLToPath, URL } from 'node:url';
 import process from 'node:process';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+// On Windows, pnpm/npm are .cmd shims that Node can only launch through a shell.
+const tool = (command, args, options) => process.platform === 'win32'
+  ? execSync(`${command} ${args.map(arg => `"${arg}"`).join(' ')}`, options)
+  : execFileSync(command, args, options);
 const temporary = mkdtempSync(join(tmpdir(), 'tzmeet-package-'));
 try {
   const packed = join(temporary, 'packed');
@@ -15,10 +19,10 @@ try {
   const empty = join(temporary, 'empty-cwd');
   mkdirSync(packed);
   mkdirSync(empty);
-  execFileSync('pnpm', ['--dir', 'packages/cli', 'pack', '--pack-destination', packed], { cwd: root, stdio: 'inherit' });
+  tool('pnpm', ['--dir', 'packages/cli', 'pack', '--pack-destination', packed], { cwd: root, stdio: 'inherit' });
   const tarballs = readdirSync(packed).filter(name => name.endsWith('.tgz'));
   assert.equal(tarballs.length, 1);
-  execFileSync('npm', ['install', '--prefix', installed, join(packed, tarballs[0]), '--ignore-scripts', '--no-audit', '--no-fund'], { stdio: 'inherit' });
+  tool('npm', ['install', '--prefix', installed, join(packed, tarballs[0]), '--ignore-scripts', '--no-audit', '--no-fund'], { stdio: 'inherit' });
   const packageRoot = join(installed, 'node_modules/tzmeet');
   const executable = join(packageRoot, 'dist/bin.js');
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));

@@ -6,6 +6,9 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ### Changed
 
+- Zones without an explicit `weekend` now default to Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem, and Sat/Sun elsewhere. This applies to the library, CLI, API and web app alike; new `defaultWeekend(id)` export.
+- Web avatars use word initials for multi-word names ("New York" → "NY").
+- Package metadata links to the GitHub repository, issues and live demo.
 - The web app now builds with Vite only (the spec's stack); the Next.js static-export entry and `next` dependency were removed. Output is still `apps/web/out`, and `TZMEET_BASE_PATH` still sets the GitHub Pages base path.
 - GHCR image publishing moved from `ci.yml` into a separate tag-triggered `docker.yml` workflow. CI still builds and smoke-tests the image, without registry write access.
 - The root README gained "API" and "Deploying" sections.
@@ -13,8 +16,7 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ## [0.1.0] - 2026-10-14
 
-Initial implementation prepared for release. This entry records completed code,
-not a claim that npm publication or a public GitHub deployment has occurred.
+Initial release.
 
 ### Added
 
@@ -33,7 +35,7 @@ not a claim that npm publication or a public GitHub deployment has occurred.
 - Core/CLI/web/workflow regression tests and desktop/mobile Playwright tests, including offline behavior, production request checks and automated light/dark accessibility audits.
 - CI on pushes/PRs for Node 20/22/24, actionlint workflow validation, npm artifact verification and browser failure traces.
 - GitHub Pages workflow that uses real Pages base-path metadata, validates/tests the exact static export, and deploys only from `main` with scoped permissions.
-- User/developer documentation, examples, release instructions and MIT license.
+- User/developer documentation, examples and MIT license.
 
 ### Known limitations
 

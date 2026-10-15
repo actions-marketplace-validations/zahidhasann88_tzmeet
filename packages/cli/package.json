@@ -3,16 +3,47 @@
   "version": "0.1.0",
   "description": "Find humane meeting slots across time zones, without a backend",
   "license": "MIT",
+  "homepage": "https://github.com/zahidhasann88/tzmeet/tree/main/packages/cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zahidhasann88/tzmeet.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/zahidhasann88/tzmeet/issues"
+  },
   "type": "module",
-  "engines": { "node": ">=20" },
-  "bin": { "tzmeet": "./dist/bin.js" },
-  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "tzmeet": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm --filter @tzmeet/core build && pnpm build"
   },
-  "dependencies": { "commander": "^14.0.2" },
-  "devDependencies": { "@tzmeet/core": "workspace:*", "esbuild": "^0.25.12", "luxon": "^3.7.2", "@types/luxon": "^3.7.1" },
-  "keywords": ["timezone", "meeting", "scheduling", "cli", "prayer", "luxon"]
+  "dependencies": {
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@tzmeet/core": "workspace:*",
+    "esbuild": "^0.25.12",
+    "luxon": "^3.7.2",
+    "@types/luxon": "^3.7.1"
+  },
+  "keywords": [
+    "timezone",
+    "meeting",
+    "scheduling",
+    "cli",
+    "prayer",
+    "luxon"
+  ]
 }

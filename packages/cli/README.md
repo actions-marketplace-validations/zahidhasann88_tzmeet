@@ -59,7 +59,7 @@ Tables show rank, first-zone date, each zone's **own local date, time range, UTC
 | `--step <minutes>` | UTC candidate grid, default 15 |
 | `--work <HH:mm-HH:mm>` | Global work override, core default 09:00–18:00 |
 | `--zone-work <zone=HH:mm-HH:mm>` | Repeatable per-zone work override |
-| `--weekend <zone=fri,sat>` | Repeatable per-zone ISO weekend; core default Sat/Sun |
+| `--weekend <zone=fri,sat>` | Repeatable per-zone ISO weekend; default Sat/Sun, or Fri/Sat for Dhaka and other Fri/Sat regions |
 | `--quiet <HH:mm-HH:mm>` | Allowed early/late window, core default 08:00–21:00 |
 | `--prayer-location <city>` | Enable common prayer instants using a city or `latitude,longitude` |
 | `--prayer-method <method>` | Karachi default; MWL and other adhan methods supported |

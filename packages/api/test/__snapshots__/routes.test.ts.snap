@@ -311,7 +311,7 @@ exports[`stateless JSON routes (in-process app.request only) > treats no availab
         "zoneId": "Asia/Dhaka",
       },
     ],
-    "message": "No shared slots. The largest rejection count was weekend in Dhaka (95 of 95 candidates). Saturday/Sunday weekend in Dhaka. Shared non-weekend weekday labels: Monday, Tuesday, Wednesday, Thursday, Friday (local dates can differ across zones).",
+    "message": "No shared slots. The largest rejection count was weekend in Dhaka (95 of 95 candidates). Friday/Saturday weekend in Dhaka. Shared non-weekend weekday labels: Monday, Tuesday, Wednesday, Thursday, Sunday (local dates can differ across zones).",
     "mostRestrictive": {
       "constraint": "weekend",
       "count": 95,

@@ -69,7 +69,7 @@ describe('stateless JSON routes (in-process app.request only)', () => {
     expect(result.diagnostics).toEqual(core.diagnostics);
   });
   it('treats no available slots as 200 with empty results and diagnostics', async () => {
-    const response = await post({ zones: [{ id: 'Asia/Dhaka' }], startDate: '2026-11-01', days: 1 });
+    const response = await post({ zones: [{ id: 'Asia/Dhaka' }], startDate: '2026-10-30', days: 1 });
     expect(response.status).toBe(200);
     const body = slotsResultSchema.parse(await response.json());
     expect(body.slots).toEqual([]);

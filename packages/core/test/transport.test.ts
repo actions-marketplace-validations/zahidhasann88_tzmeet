@@ -5,7 +5,8 @@ describe('shared transport parser (browser-safe, no scheduling)', () => {
   it('resolves defaults with an explicit date and never invents today', () => {
     const input = parseScheduleInput({ zones: 'Asia/Dhaka,Europe/London', date: '2026-11-02' });
     expect(input).toMatchObject({ startDate: '2026-11-02', durationMinutes: 30, days: 5, stepMinutes: 15 });
-    expect(input.zones[0]).toMatchObject({ workStart: '09:00', workEnd: '18:00', quietBefore: '08:00', quietAfter: '21:00', weekend: [6, 7] });
+    expect(input.zones[0]).toMatchObject({ workStart: '09:00', workEnd: '18:00', quietBefore: '08:00', quietAfter: '21:00', weekend: [5, 6] });
+    expect(input.zones[1]!.weekend).toEqual([6, 7]);
     expect(() => parseScheduleInput({ zones: 'UTC' })).toThrow('date is required');
   });
   it('keeps config labels/rules when replacing zone order and applies overrides in order', () => {

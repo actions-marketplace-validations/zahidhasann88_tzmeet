@@ -49,7 +49,7 @@ Examples:
   tzmeet zones london
 
 Precedence: config/defaults < global flags < per-zone flags.
-Core default weekend is Sat/Sun. Set Asia/Dhaka=fri,sat explicitly for Dhaka.
+Default weekend is Sat/Sun, or Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain, Jerusalem.
 Prayer locations: Dhaka, London, New York, Karachi, Makkah, Dubai, Singapore.
 No slots found is a successful search (exit 0); invalid input exits 1.
 `)

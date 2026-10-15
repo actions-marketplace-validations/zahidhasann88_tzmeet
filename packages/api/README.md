@@ -1,6 +1,6 @@
 # @tzmeet/api
 
-Stateless HTTP REST transport over the unchanged tzmeet scheduling engine. **Implementation Phases 1–4 are complete. Nothing has been deployed or published.** The existing web app remains browser-only, static, offline-capable, and independent of this API.
+Stateless HTTP REST transport over the unchanged tzmeet scheduling engine. The existing web app remains browser-only, static, offline-capable, and independent of this API.
 
 No database, accounts, sessions, saved payloads, or persistent user data. The only request-derived state is bounded, short-lived **hashed-IP rate counters in process/isolate memory**. See rate-limit scope below.
 
@@ -39,7 +39,7 @@ const response = await app.request('/v1/health');
 
 Slots query options: `top=1..50` (default **10**), `format=json|text|ics` (default **json**). JSON returns `{slots,diagnostics,meta:{count,generatedAt,version}}`; every slot and diagnostics object is directly core output. No slots is HTTP **200**, with empty JSON/ICS or diagnostic text. Text joins the exact browser invite formatter with blank lines. ICS contains all returned/top-capped slots in **one calendar**, each `STATUS:TENTATIVE`, UTC DTSTART/DTEND, stable unique UID, escaped text and UTF-8 75-octet folding.
 
-HTTP dates are explicit; no server-today fallback. CLI flags and GET overrides use the same additive pure `core.parseScheduleInput()` helper; CLI config/today behavior remains in its Node wrapper. Defaults: 5 days, 30-minute duration, 15-minute step, 09:00–18:00 work, 08:00–21:00 allowed hours, Sat/Sun weekends. Set Dhaka's Fri/Sat weekend explicitly if desired.
+HTTP dates are explicit; no server-today fallback. CLI flags and GET overrides use the same additive pure `core.parseScheduleInput()` helper; CLI config/today behavior remains in its Node wrapper. Defaults: 5 days, 30-minute duration, 15-minute step, 09:00–18:00 work, 08:00–21:00 allowed hours, Sat/Sun weekends except Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem (core `defaultWeekend()`).
 
 ### curl examples
 
@@ -151,48 +151,3 @@ Factory equivalents: `apiKeys`, `corsOrigins`, `rateLimit:{limit,windowMs,maxBuc
 - Key-protected zones/slots remain `no-store` even for otherwise cacheable ranges. Health remains public. No server-side result cache or request persistence.
 
 Conversions use Luxon, not hand-written offset arithmetic. Gaps/date skips reject instead of silently shifting. Repeated fall-back times require a matching explicit offset or `disambiguation=earlier|later`. Explicit offsets must agree with the source zone. Prayer calculations are approximate and not mosque timetables; original core limitations apply.
-
-## Docker (you deploy later)
-
-Build context is the repository root. The multi-stage image contains production dependencies/core output, runs as `node` (non-root), binds 0.0.0.0, handles termination, and includes `/v1/health` checks.
-
-```sh
-docker build -f packages/api/Dockerfile -t tzmeet-api .
-docker run --rm -p 3000:3000 \
-  -e PORT=3000 -e HOST=0.0.0.0 \
-  -e API_KEYS='replace-with-a-long-random-secret' \
-  -e CORS_ORIGINS='https://your-app.example' \
-  -e RATE_LIMIT=60 -e RATE_WINDOW_MS=60000 tzmeet-api
-curl http://localhost:3000/v1/health
-curl -H 'Authorization: Bearer replace-with-a-long-random-secret' \
-  'http://localhost:3000/v1/zones?search=dhaka'
-```
-
-Place behind HTTPS in production. Docker was **not available in the implementation sandbox**, so actual image build/run is assigned to the checked-in CI job. The same `pnpm deploy --prod --legacy` standalone dependency layout was locally built and exercised; this command only prepares local files, not a cloud deployment.
-
-## Cloudflare Workers (you deploy later)
-
-The Worker requires no persistent bindings and no `nodejs_compat`. Wrangler is pinned in devDependencies; use Node 22+ for its CLI.
-
-```sh
-pnpm --filter @tzmeet/api... build
-WRANGLER_SEND_METRICS=false pnpm --filter @tzmeet/api worker:dry-run
-pnpm --filter @tzmeet/api worker:size
-
-# Only when YOU are ready to deploy, using your own Cloudflare account:
-cd packages/api
-pnpm exec wrangler login
-pnpm exec wrangler secret put API_KEYS
-# Edit non-secret [vars] in wrangler.toml for your CORS/rate configuration.
-pnpm exec wrangler deploy
-```
-
-Verified local dry-run (Wrangler 4.151.0, 2026-10-14): **243.70 KiB uncompressed / 74.62 KiB gzip** (`249,549 / 76,407` bytes). No upload/deployment occurred. Cloudflare's current official documentation states **64 MiB uncompressed** for Free/Paid Workers, with no compressed-size cap; this bundle fits, and also fits the older conservative 3 MiB gzip allowance. [1](https://developers.cloudflare.com/workers/platform/limits/)
-
-**Bundle size is not CPU suitability.** Free Workers have **10 ms CPU/request**, which meaningful multi-zone/long-range searches can exceed. Use Node/Docker or an appropriately configured Paid Worker for such workloads, and profile production traffic. Dry-run does not prove edge CPU/startup/runtime performance. [1](https://developers.cloudflare.com/workers/platform/limits/)
-
-## CI and verification
-
-Existing Node 20/22/24 jobs include API lint/typecheck/tests/build. Added a Node 22 Worker dry-run/size job and a Docker build/non-root health smoke job. CI builds and smoke-tests the image without registry access. The separate `.github/workflows/docker.yml` pushes to GHCR **only on `v*` version tags**, after lint/typecheck/tests and a container smoke test; image names are `ghcr.io/<owner>/<repository>/tzmeet-api:<version>`. Actions/GHCR must be enabled by the repository owner.
-
-Tests use `app.request()`/Worker fetch in-process, not external network: exact core scheduling parity, fixed-clock endpoint snapshots, mismatched DST calendars/folds/gaps, typo suggestions, API limits, malformed JSON/content type, actual body byte limits, fake-time rate resets, trusted IP boundaries, native key verification, security/log/CORS/cache behavior, parsed multi-event ICS, exact shared invite text, full OpenAPI validation without remote references, portable browser/Worker bundling, adapter and CI contracts.

@@ -15,3 +15,4 @@ release-artifacts/
 **/.dev.vars*
 
 /build-docs.txt
+/docs/RELEASING.md

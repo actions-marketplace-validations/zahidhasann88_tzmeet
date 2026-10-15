@@ -4,6 +4,15 @@
   "description": "Stateless, portable REST transport for tzmeet core",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://github.com/zahidhasann88/tzmeet/tree/main/packages/api#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zahidhasann88/tzmeet.git",
+    "directory": "packages/api"
+  },
+  "bugs": {
+    "url": "https://github.com/zahidhasann88/tzmeet/issues"
+  },
   "engines": {
     "node": ">=20"
   },

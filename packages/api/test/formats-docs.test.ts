@@ -34,10 +34,10 @@ describe('shared formats and generated documentation', () => {
     expect(new Set(components.map(c => c.getFirstPropertyValue('uid'))).size).toBe(2);
   });
   it('supports GET formats and empty calendars/text without treating no slots as an error', async () => {
-    const ics = await app.request('/v1/slots?zones=Asia/Dhaka&date=2026-11-01&days=1&format=ics');
+    const ics = await app.request('/v1/slots?zones=Asia/Dhaka&date=2026-10-30&days=1&format=ics');
     expect(ics.status).toBe(200);
     expect(new ICAL.Component(ICAL.parse(await ics.text())).getAllSubcomponents('vevent')).toHaveLength(0);
-    const text = await app.request('/v1/slots?zones=Asia/Dhaka&date=2026-11-01&days=1&format=text');
+    const text = await app.request('/v1/slots?zones=Asia/Dhaka&date=2026-10-30&days=1&format=text');
     expect(text.status).toBe(200); expect(await text.text()).toContain('weekend');
   });
   it('validates the entire generated OpenAPI document without remote resolution', async () => {

@@ -1,7 +1,7 @@
 /** Browser-safe shared time-zone meeting search. No Node APIs or network requests. */
 export { findSlots, classifySpan, classifySpans, InputValidationError } from './engine.js';
 export { getPrayerWindows } from './prayer.js';
-export { validateInput, listTimeZones, findSlotsSchema, configSchema, zoneSchema, prayerSchema, cities, prayerMethods } from './schema.js';
+export { validateInput, listTimeZones, defaultWeekend, findSlotsSchema, configSchema, zoneSchema, prayerSchema, cities, prayerMethods } from './schema.js';
 export type { FindSlotsInput, NormalizedInput, ZoneRule, PrayerRule, Config } from './schema.js';
 export type { Classification, Constraint, ConstraintCount, Diagnostics, FindSlotsResult, Slot, ZoneSlot, PrayerWindow, SpanEvaluation } from './types.js';
 

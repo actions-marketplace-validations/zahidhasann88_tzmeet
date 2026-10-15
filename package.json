@@ -26,5 +26,13 @@
     "typescript-eslint": "^8.46.1",
     "vitest": "^3.2.4",
     "yaml": "^2.9.1"
+  },
+  "homepage": "https://zahidhasann88.github.io/tzmeet/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zahidhasann88/tzmeet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zahidhasann88/tzmeet/issues"
   }
 }

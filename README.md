@@ -36,7 +36,7 @@ Other useful commands: `pnpm lint`, `pnpm typecheck`, `pnpm test:e2e` (Playwrigh
 
 ```sh
 tzmeet --zones Asia/Dhaka,America/New_York,Europe/London \
-  --date 2026-11-02 --duration 30 --weekend Asia/Dhaka=fri,sat --top 2
+  --date 2026-11-02 --duration 30 --top 2
 ```
 
 ```
@@ -53,7 +53,7 @@ Useful flags:
 - `--days 5` sets how many days to search, and `--top 10` how many results to show.
 - `--work 09:00-18:00` sets work hours for everyone. `--zone-work America/New_York=08:00-17:00` overrides one zone.
 - `--quiet 08:00-21:00` sets the earliest and latest acceptable times.
-- `--weekend Asia/Dhaka=fri,sat` sets one zone's weekend.
+- `--weekend Europe/London=none` sets one zone's weekend. Dhaka and other Fri/Sat regions already default to Fri/Sat.
 - `--prayer-location Dhaka --prayer-method Karachi --prayer-buffer 10` turns on prayer times.
 - `--json` prints machine-readable output. `--config path` loads a config file.
 - `tzmeet zones london` searches time zone names.
@@ -90,7 +90,7 @@ import { findSlots } from '@tzmeet/core';
 
 const result = findSlots({
   zones: [
-    { id: 'Asia/Dhaka', label: 'Dhaka', weekend: [5, 6] },
+    { id: 'Asia/Dhaka', label: 'Dhaka' },              // Fri/Sat weekend by default
     { id: 'America/New_York', label: 'New York' },
     { id: 'Europe/London', label: 'London' },
   ],
@@ -106,7 +106,7 @@ if (result.slots.length === 0) {
 }
 ```
 
-Defaults are 09:00–18:00 work hours, 08:00–21:00 quiet hours, a Sat/Sun weekend (`[6, 7]`, ISO weekdays), 5 days, 30-minute meetings and a 15-minute step.
+Defaults are 09:00–18:00 work hours, 08:00–21:00 quiet hours, a Sat/Sun weekend (`[6, 7]`, ISO weekdays; Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem default to Fri/Sat `[5, 6]`), 5 days, 30-minute meetings and a 15-minute step.
 
 Other exports include `validateInput()`, `listTimeZones()`, `convertTime()`, `getPrayerWindows()`, `classifySpan()`, and the zod schemas (`findSlotsSchema`, `configSchema`) used by the CLI, web app and API. See [packages/core/README.md](packages/core/README.md).
 
@@ -147,12 +147,12 @@ Limits: 32 KB body, 8 zones, 14 days, 50 results.
 
 ```sh
 # Simple search
-curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,America/New_York,Europe/London&date=2026-11-02&weekend=Asia/Dhaka=fri,sat&top=5"
+curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,America/New_York,Europe/London&date=2026-11-02&top=5"
 
 # Per-zone rules and a prayer buffer
 curl http://localhost:3000/v1/slots -H 'Content-Type: application/json' -d '{
   "zones": [
-    {"id": "Asia/Dhaka", "workStart": "10:00", "workEnd": "17:00", "weekend": [5, 6]},
+    {"id": "Asia/Dhaka", "workStart": "10:00", "workEnd": "17:00"},
     {"id": "Europe/London"},
     {"id": "America/New_York", "workStart": "08:00", "workEnd": "17:00"}
   ],
@@ -198,32 +198,6 @@ print(res.json()['slots'])
 ```
 
 API keys, CORS, rate limiting and caching are configured with environment variables. See [packages/api/README.md](packages/api/README.md).
-
-## Deploying
-
-**Web app (GitHub Pages).** In your repo, go to Settings → Pages and set the source to "GitHub Actions". Every push to `main` then tests the app and deploys it via `.github/workflows/pages.yml`.
-
-**API with Docker.**
-
-```sh
-docker build -f packages/api/Dockerfile -t tzmeet-api .
-docker run -p 3000:3000 -e API_KEYS=your-secret -e CORS_ORIGINS=https://your-site.example tzmeet-api
-```
-
-Pushing a `v*` tag publishes the image to GitHub Container Registry (`.github/workflows/docker.yml`).
-
-**API on Cloudflare Workers.**
-
-```sh
-cd packages/api
-pnpm exec wrangler login
-pnpm exec wrangler secret put API_KEYS   # optional
-pnpm exec wrangler deploy
-```
-
-Long multi-zone searches can exceed the Workers free plan's 10 ms CPU limit. Use Docker or a paid plan for heavy use.
-
-**CLI on npm.** See [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Known limitations
 

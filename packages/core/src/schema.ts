@@ -28,12 +28,20 @@ export const prayerSchema = z.object({
   bufferMinutes: z.number().int().min(0).max(180).default(10)
 }).strict();
 
+/** Zones whose working week is Sunday–Thursday. Every other zone defaults to a Sat/Sun weekend. */
+const fridaySaturdayZones = new Set(['Asia/Dhaka', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Kuwait', 'Asia/Bahrain', 'Asia/Jerusalem']);
+
+/** Regional default weekend (ISO weekdays) used when a zone omits `weekend`: [5, 6] for Fri/Sat regions, otherwise [6, 7]. */
+export function defaultWeekend(id: string): number[] {
+  return fridaySaturdayZones.has(id) ? [5, 6] : [6, 7];
+}
+
 const zoneObject = z.object({
   id: z.string().refine(id => IANAZone.isValidZone(id), 'Unknown IANA time zone'),
   label: z.string().trim().min(1).max(80).optional(),
   workStart: timeSchema.default('09:00'),
   workEnd: timeSchema.default('18:00'),
-  weekend: z.array(z.number().int().min(1).max(7)).max(7).default([6, 7]),
+  weekend: z.array(z.number().int().min(1).max(7)).max(7).optional(),
   quietBefore: timeSchema.default('08:00'),
   quietAfter: timeSchema.default('21:00'),
   prayer: prayerSchema.optional()
@@ -44,8 +52,8 @@ export const zoneSchema = zoneObject.superRefine((zone, ctx) => {
   if (zone.workStart >= zone.workEnd) ctx.addIssue({ code: 'custom', path: ['workEnd'], message: 'workEnd must be after workStart (overnight work windows are not supported)' });
   if (zone.quietBefore >= zone.quietAfter) ctx.addIssue({ code: 'custom', path: ['quietAfter'], message: 'quietAfter must be after quietBefore' });
   if (zone.workStart < zone.quietBefore || zone.workEnd > zone.quietAfter) ctx.addIssue({ code: 'custom', path: ['workStart'], message: 'Work hours must fit inside quietBefore–quietAfter' });
-  if (new Set(zone.weekend).size !== zone.weekend.length) ctx.addIssue({ code: 'custom', path: ['weekend'], message: 'Weekend days must be unique' });
-});
+  if (zone.weekend && new Set(zone.weekend).size !== zone.weekend.length) ctx.addIssue({ code: 'custom', path: ['weekend'], message: 'Weekend days must be unique' });
+}).transform(zone => ({ ...zone, weekend: zone.weekend ?? defaultWeekend(zone.id) }));
 
 const zonesSchema = z.array(zoneSchema).min(1, 'Add at least one zone').max(20).refine(
   zones => new Set(zones.map(zone => zone.id)).size === zones.length,
@@ -65,7 +73,7 @@ export const findSlotsSchema = z.object(fields).strict();
 /** JSON config schema. Omitted zones/date may be supplied by CLI flags. */
 export const configSchema = z.object({ ...fields, zones: zonesSchema.optional(), startDate: dateSchema.optional(), top: z.number().int().min(1).max(1000).default(10) }).strict();
 
-/** Input fields with optional defaults (09–18 work, 08–21 allowed, Sat/Sun weekend). */
+/** Input fields with optional defaults (09–18 work, 08–21 allowed, regional weekend via defaultWeekend()). */
 export type ZoneRule = z.input<typeof zoneSchema>;
 /** Location, adhan method and a symmetric buffer around five obligatory prayers. */
 export type PrayerRule = z.input<typeof prayerSchema>;

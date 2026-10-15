@@ -22,10 +22,16 @@ export function friendlyName(id: string): string {
   return id === 'UTC' ? 'UTC' : id.split('/').at(-1)!.replaceAll('_', ' ');
 }
 
-/** Regional defaults are UI defaults only; the shared core's weekend remains Sat/Sun. */
+/** Avatar initials: first letters of the first two words ("New York" → "NY"), else the first two letters ("Dhaka" → "DH"). */
+export function initials(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? [...words[0]!].slice(0, 1).concat([...words[1]!].slice(0, 1)) : [...(words[0] ?? '')].slice(0, 2);
+  return letters.join('').toUpperCase();
+}
+
+/** New zone with core defaults, including the regional weekend (e.g. Fri/Sat for Dhaka). */
 export function regionalZone(id: string): NormalizedInput['zones'][number] {
-  const fridaySaturday = ['Asia/Dhaka', 'Asia/Riyadh', 'Asia/Qatar', 'Asia/Kuwait', 'Asia/Bahrain', 'Asia/Jerusalem'];
-  return zoneSchema.parse({ id, label: friendlyName(id), weekend: fridaySaturday.includes(id) ? [5, 6] : [6, 7] });
+  return zoneSchema.parse({ id, label: friendlyName(id) });
 }
 
 export function defaultState(): WebState {
