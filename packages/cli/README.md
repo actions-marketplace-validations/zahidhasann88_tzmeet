@@ -4,39 +4,33 @@ Find humane meeting slots across teams in different time zones. Node **20+**, no
 
 ## Install
 
-Once published to npm:
+Run it without installing:
+
+```sh
+npx tzmeet --zones Asia/Dhaka,Europe/London --date 2026-11-02
+```
+
+Or install it globally:
 
 ```sh
 npm install --global tzmeet
+tzmeet --help
 ```
 
-For an unpublished local build from the monorepo:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm build
-node packages/cli/dist/bin.js --help
-# Create the installable npm tarball:
-pnpm --dir packages/cli pack
-npm install --global ./packages/cli/tzmeet-0.1.0.tgz
-```
-
-Building/packing does not publish anything. `prepack` rebuilds the core and CLI; the tarball includes the executable, source map, MIT license, third-party notices, and this README.
+Source, web app and REST API: [github.com/zahidhasann88/tzmeet](https://github.com/zahidhasann88/tzmeet). Live demo: [zahidhasann88.github.io/tzmeet](https://zahidhasann88.github.io/tzmeet/).
 
 ## Examples
 
 ```sh
 tzmeet --zones Asia/Dhaka,America/New_York,Europe/London \
-  --date 2026-11-02 --duration 30 --days 5 \
-  --weekend Asia/Dhaka=fri,sat
+  --date 2026-11-02 --duration 30 --days 5
 
 tzmeet --zones Asia/Dhaka,America/New_York,Europe/London \
   --date 2026-11-02 --duration 30 \
   --zone-work America/New_York=08:00-17:00 \
-  --weekend Asia/Dhaka=fri,sat --quiet 07:00-22:00 --top 5
+  --quiet 07:00-22:00 --top 5
 
 tzmeet --zones Asia/Dhaka,Europe/London --date 2026-11-02 \
-  --weekend Asia/Dhaka=fri,sat \
   --prayer-location Dhaka --prayer-method Karachi --prayer-buffer 10
 
 tzmeet --config ./team.json --date 2026-11-02 --top 3 --json > slots.json
@@ -69,7 +63,7 @@ Tables show rank, first-zone date, each zone's **own local date, time range, UTC
 | `--json` | Machine-readable result; stdout contains only JSON |
 | `--help`, `--version` | Usage/version, exit 0 |
 
-**Dhaka's Friday/Saturday weekend is not inferred by the core/CLI.** Set `--weekend Asia/Dhaka=fri,sat` or `weekend: [5, 6]` in config. Weekend flag values can be weekday abbreviations/full names (case-insensitive), ISO numbers 1–7, `none`, or an empty assignment to remove weekends. Duplicate weekdays are invalid.
+Weekends default to Sat/Sun, except Fri/Sat for Dhaka, Riyadh, Qatar, Kuwait, Bahrain and Jerusalem. Override any zone with e.g. `--weekend Europe/London=none` or `weekend: [5, 6]` in config. Weekend flag values can be weekday abbreviations/full names (case-insensitive), ISO numbers 1–7, `none`, or an empty assignment to remove weekends. Duplicate weekdays are invalid.
 
 Duration/step are integer minutes, 1–1440. Work hours must be within allowed hours, and neither window may be overnight. `24:00` is not accepted. Zone-specific overrides must target a selected zone; mistyped IDs do not silently create participants.
 
@@ -119,4 +113,4 @@ Work/quiet endpoints are inclusive. Ending exactly at a weekend midnight blocks;
 
 Score is the sum of `ideal=2`, `acceptable=1`, plus a bounded tie-break below 0.1 preferring earlier UTC instants and the first zone's work-day midpoint. No tie-break can outweigh a classification point. Diagnostics count each zone/constraint separately; these counts can overlap.
 
-See the monorepo README for the exact scoring formula, the browser-safe library API, full-span semantics, and known limitations. License: MIT.
+See the [project README](https://github.com/zahidhasann88/tzmeet#readme) for the exact scoring formula, the browser-safe library API, full-span semantics, and known limitations. License: MIT.
