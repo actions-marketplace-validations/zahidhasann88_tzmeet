@@ -4,6 +4,8 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 ### Added
 
 - Per-zone holidays: list local dates (`holidays: ['2026-12-16']`, `--holiday Asia/Dhaka=2026-12-16`, `?holiday=…`) and they block those days like a weekend. Diagnostics report `holiday` as its own constraint, and the web timeline shows holidays in their own pattern.

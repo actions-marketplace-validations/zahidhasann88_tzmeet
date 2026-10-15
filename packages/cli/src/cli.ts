@@ -20,7 +20,7 @@ export function runCLI(args: string[] = process.argv.slice(2), context: CliConte
   const program = new Command();
   program
     .name('tzmeet')
-    .version('0.1.0')
+    .version('0.2.0')
     .description('Find humane meeting slots across IANA time zones. No backend or calendar upload.')
     .allowExcessArguments(false)
     .exitOverride()

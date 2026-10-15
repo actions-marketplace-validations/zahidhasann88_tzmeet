@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findSlots, parseScheduleInput, type FindSlotsInput } from '@tzmeet/core';
-import { createApp } from '../src/app.js';
+import { API_VERSION, createApp } from '../src/app.js';
 import { conversionResultSchema, errorSchema, healthSchema, slotsResultSchema } from '../src/schemas.js';
 
 const clock = () => new Date('2026-10-14T12:00:00.000Z');
@@ -36,7 +36,7 @@ describe('stateless JSON routes (in-process app.request only)', () => {
     const core = findSlots(input);
     expect(body.slots).toEqual(core.slots.slice(0, 2));
     expect(body.diagnostics).toEqual(core.diagnostics);
-    expect(body.meta).toEqual({ count: 2, generatedAt: clock().toISOString(), version: '0.1.0' });
+    expect(body.meta).toEqual({ count: 2, generatedAt: clock().toISOString(), version: API_VERSION });
     expect(body).toMatchSnapshot();
     expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
@@ -103,7 +103,7 @@ describe('stateless JSON routes (in-process app.request only)', () => {
     const response = await app.request('/openapi.json');
     expect(response.status).toBe(200);
     const body: unknown = await response.json();
-    expect(body).toMatchObject({ openapi: '3.0.3', info: { title: 'tzmeet REST API', version: '0.1.0' }, paths: { '/v1/slots': { get: {}, post: {} }, '/v1/convert': { get: {} }, '/v1/zones': { get: {} }, '/v1/health': { get: {} } } });
+    expect(body).toMatchObject({ openapi: '3.0.3', info: { title: 'tzmeet REST API', version: API_VERSION }, paths: { '/v1/slots': { get: {}, post: {} }, '/v1/convert': { get: {} }, '/v1/zones': { get: {} }, '/v1/health': { get: {} } } });
   });
 });
 

@@ -262,7 +262,8 @@ describe('errors, help and search', () => {
     expect(invoke(['--help']).code).toBe(0);
     expect(invoke(['--help']).stdout).toContain('--zone-work');
     expect(invoke(['--help']).stderr).toBe('');
-    expect(invoke(['--version']).stdout).toBe('0.1.0\n');
+    const { version } = JSON.parse(readFileSync('packages/cli/package.json', 'utf8')) as { version: string };
+    expect(invoke(['--version']).stdout).toBe(`${version}\n`);
   });
 
   it('searches zone names without needing a config or meeting input', () => {

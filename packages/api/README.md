@@ -33,7 +33,7 @@ const response = await app.request('/v1/health');
 | GET | `/v1/slots` | Required comma-separated `zones` and `date`; optional `duration`, `days`, `step`, `work`, repeatable `zoneWork`/`weekend`/`holiday`, `quiet`, `prayerBuffer`, `prayerLocation`, `prayerMethod` |
 | GET | `/v1/zones?search=dhaka` | `{zones:[{id,label,offset,offsetMinutes}]}` with current offsets |
 | GET | `/v1/convert` | Required local ISO `time`, `from`, comma-separated `to`; optional `disambiguation=reject|earlier|later` |
-| GET | `/v1/health` | `{status:"ok",version:"0.1.0"}`; public even in key mode |
+| GET | `/v1/health` | `{status:"ok",version:"0.2.0"}`; public even in key mode |
 | GET | `/openapi.json` | Zod-generated OpenAPI 3.0.3, examples, formats, and optional key schemes |
 | GET | `/docs` | Public interactive Scalar reference |
 

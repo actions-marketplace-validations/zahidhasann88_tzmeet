@@ -10,7 +10,7 @@ Use it as a pnpm workspace dependency, or build/pack it locally:
 pnpm --filter @tzmeet/core build
 pnpm --dir packages/core pack
 # From a consuming project:
-npm install /path/to/tzmeet/packages/core/tzmeet-core-0.1.0.tgz
+npm install /path/to/tzmeet/packages/core/tzmeet-core-0.2.0.tgz
 ```
 
 The normal ESM export includes TypeScript declarations and can be bundled by browser tools.

@@ -8,7 +8,7 @@ import { HTTPException } from 'hono/http-exception';
 import { ApiError, validationError } from './errors.js';
 import { apiConversionSchema, apiInputSchema, convertQuerySchema, conversionResultSchema, errorSchema, healthSchema, resultQuerySchema, slotsGetQuerySchema, slotsResultSchema, zoneInfoSchema, zonesQuerySchema } from './schemas.js';
 
-export const API_VERSION = '0.1.0';
+export const API_VERSION = '0.2.0';
 /** Platform-neutral dependencies; injected clocks make app.request() tests deterministic. */
 export type { AppOptions, LogEntry } from './security.js';
 export { optionsFromEnv } from './security.js';

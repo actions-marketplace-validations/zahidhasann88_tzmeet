@@ -1,6 +1,6 @@
 {
   "name": "tzmeet",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Find humane meeting slots across time zones, without a backend",
   "license": "MIT",
   "homepage": "https://github.com/zahidhasann88/tzmeet/tree/main/packages/cli#readme",
