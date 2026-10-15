@@ -2,6 +2,12 @@
 
 Find meeting times that work for a team spread across time zones.
 
+**[Try it live →](https://zahidhasann88.github.io/tzmeet/)**
+
+![Shared 24-hour timeline for Dhaka, London and New York](docs/screenshots/demo.png)
+
+![Ranked meeting times with ideal and acceptable labels for each zone](docs/screenshots/result.png)
+
 You give it the zones, each team's working hours and weekend, and optionally prayer times. It scans the week and ranks the slots where nobody is asked to join at 2 a.m., on their weekend, or during prayer.
 
 It comes in four pieces that all share one core library:
