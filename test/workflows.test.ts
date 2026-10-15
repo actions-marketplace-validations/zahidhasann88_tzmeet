@@ -26,6 +26,9 @@ interface Workflow {
   concurrency: { group: string; 'cancel-in-progress': boolean };
   jobs: Record<string, Job>;
 }
+/** True when a step uses the given action at any version, so Dependabot bumps don't break these checks. */
+const uses = (step: Step, action: string) => step.uses?.startsWith(`${action}@`) ?? false;
+
 function workflow(file: string): Workflow {
   const document = parseDocument(readFileSync(`.github/workflows/${file}`, 'utf8'), { uniqueKeys: true });
   expect(document.errors).toEqual([]);
@@ -55,9 +58,9 @@ describe('CI and deployment contracts', () => {
     const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as { packageManager: string };
     for (const file of ['ci.yml', 'docker.yml', 'pages.yml']) {
       for (const job of Object.values(workflow(file).jobs)) {
-        const pnpm = job.steps?.find(step => step.uses === 'pnpm/action-setup@v4');
+        const pnpm = job.steps?.find(step => uses(step, 'pnpm/action-setup'));
         if (pnpm) expect(`pnpm@${pnpm.with!.version}`).toBe(manifest.packageManager);
-        const node = job.steps?.find(step => step.uses === 'actions/setup-node@v4');
+        const node = job.steps?.find(step => uses(step, 'actions/setup-node'));
         if (node) expect(node.with!['cache-dependency-path']).toBe('pnpm-lock.yaml');
       }
     }
@@ -68,7 +71,7 @@ describe('CI and deployment contracts', () => {
     expect(browser.needs).toBe('check');
     expect(browser.steps!.some(step => step.run === 'pnpm test:e2e')).toBe(true);
     expect(browser.steps!.some(step => step.run?.includes('playwright install --with-deps chromium'))).toBe(true);
-    expect(browser.steps!.find(step => step.uses === 'actions/upload-artifact@v4')!.if).toBe('failure()');
+    expect(browser.steps!.find(step => uses(step, 'actions/upload-artifact'))!.if).toBe('failure()');
   });
 
   it('deploys only main and never runs a privileged PR deployment', () => {
@@ -86,14 +89,14 @@ describe('CI and deployment contracts', () => {
   it('uses real Pages metadata, tests the exact prefixed export, and uploads no server files', () => {
     const steps = workflow('pages.yml').jobs.build!.steps!;
     const metadata = steps.find(step => step.id === 'pages')!;
-    expect(metadata.uses).toBe('actions/configure-pages@v5');
+    expect(uses(metadata, 'actions/configure-pages')).toBe(true);
     const build = steps.find(step => step.run === 'pnpm --filter @tzmeet/web build')!;
     expect(build.env!.TZMEET_BASE_PATH).toBe('${{ steps.pages.outputs.base_path }}');
     const browser = steps.find(step => step.run === 'pnpm test:e2e')!;
     expect(browser.env!.TZMEET_E2E_BASE_PATH).toBe(build.env!.TZMEET_BASE_PATH);
     expect(browser.env!.TZMEET_E2E_SKIP_BUILD).toBe('1');
-    expect(steps.indexOf(browser)).toBeLessThan(steps.findIndex(step => step.uses === 'actions/upload-pages-artifact@v3'));
-    expect(steps.find(step => step.uses === 'actions/upload-pages-artifact@v3')!.with!.path).toBe('apps/web/out');
+    expect(steps.indexOf(browser)).toBeLessThan(steps.findIndex(step => uses(step, 'actions/upload-pages-artifact')));
+    expect(steps.find(step => uses(step, 'actions/upload-pages-artifact'))!.with!.path).toBe('apps/web/out');
   });
 
   it('keeps package versions and MIT license consistent', () => {
@@ -117,10 +120,10 @@ describe('API CI contracts', () => {
   it('builds/smokes images in CI without registry write access', () => {
     const image = workflow('ci.yml').jobs['api-image']!;
     expect(image.permissions).toBeUndefined();
-    const builds = image.steps!.filter(step => step.uses === 'docker/build-push-action@v6');
+    const builds = image.steps!.filter(step => uses(step, 'docker/build-push-action'));
     expect(builds).toHaveLength(1);
     expect(builds[0]!.with!.push).toBe(false);
-    expect(image.steps!.some(step => step.uses === 'docker/login-action@v3')).toBe(false);
+    expect(image.steps!.some(step => uses(step, 'docker/login-action'))).toBe(false);
     expect(image.steps!.some(step => step.run?.includes('curl --fail --silent'))).toBe(true);
   });
   it('publishes to GHCR from a separate workflow, only on version tags, after checks and a smoke test', () => {
@@ -134,7 +137,7 @@ describe('API CI contracts', () => {
     expect(publish.permissions).toEqual({ contents: 'read', packages: 'write' });
     const steps = publish.steps!;
     const smoke = steps.findIndex(step => step.run?.includes('curl --fail --silent'));
-    const push = steps.findIndex(step => step.uses === 'docker/build-push-action@v6' && step.with!.push === true);
+    const push = steps.findIndex(step => uses(step, 'docker/build-push-action') && step.with!.push === true);
     expect(smoke).toBeGreaterThan(-1);
     expect(push).toBeGreaterThan(smoke);
   });
