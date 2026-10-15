@@ -1,0 +1,18 @@
+{
+  "name": "@tzmeet/core",
+  "version": "0.1.0",
+  "description": "Browser-safe meeting slot search with time-zone and prayer constraints",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "adhan": "^4.4.3", "luxon": "^3.7.2", "zod": "^3.25.76" },
+  "devDependencies": { "@types/luxon": "^3.7.1" }
+}

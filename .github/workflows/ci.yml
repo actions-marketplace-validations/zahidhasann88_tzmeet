@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+
+jobs:
+  workflow-lint:
+    name: Validate workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check GitHub Actions syntax and shell commands
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+  check:
+    name: Node ${{ matrix.node }} checks
+    needs: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Verify installable npm package outside the workspace
+        if: matrix.node == 20
+        run: pnpm check:package
+
+  browser:
+    name: Static app / desktop + mobile
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tzmeet/web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Upload browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-traces
+          path: apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  api-worker:
+    name: Verify portable API Worker bundle
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tzmeet/api... build
+      - run: pnpm --filter @tzmeet/api worker:dry-run
+      - run: pnpm --filter @tzmeet/api worker:size
+
+  api-image:
+    name: Build and smoke-test API image
+    needs: [check, api-worker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/api/Dockerfile
+          load: true
+          push: false
+          tags: tzmeet-api:ci
+      - name: Smoke-test non-root API container
+        run: |
+          docker run -d --name tzmeet-api-check -p 127.0.0.1:3000:3000 tzmeet-api:ci
+          trap 'docker rm -f tzmeet-api-check' EXIT
+          test "$(docker inspect --format '{{.Config.User}}' tzmeet-api-check)" = node
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/v1/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs tzmeet-api-check
+          exit 1

@@ -1,0 +1,42 @@
+{
+  "name": "@tzmeet/api",
+  "version": "0.1.0",
+  "description": "Stateless, portable REST transport for tzmeet core",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "start": "node dist/node.js",
+    "dev:worker": "wrangler dev --ip 0.0.0.0",
+    "worker:dry-run": "wrangler deploy --dry-run --outdir .wrangler/bundle",
+    "worker:size": "node scripts/bundle-size.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@hono/zod-openapi": "0.19.10",
+    "@scalar/hono-api-reference": "0.8.10",
+    "@tzmeet/core": "workspace:*",
+    "hono": "^4.12.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0",
+    "ical.js": "^2.2.1",
+    "wrangler": "4.151.0"
+  }
+}

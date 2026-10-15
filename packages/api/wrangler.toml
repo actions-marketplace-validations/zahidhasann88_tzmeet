@@ -1,0 +1,15 @@
+name = "tzmeet-api"
+main = "src/worker.ts"
+compatibility_date = "2026-10-14"
+workers_dev = true
+minify = true
+
+[vars]
+CORS_ORIGINS = "*"
+RATE_LIMIT = "60"
+RATE_WINDOW_MS = "60000"
+RATE_MAX_BUCKETS = "10000"
+# Set API_KEYS through `wrangler secret put API_KEYS`, never commit real keys.
+# No KV, D1, R2, Durable Objects, or persistent bindings are required.
+# CPU-heavy searches may exceed the Free plan's 10 ms CPU allowance;
+# profile actual workloads and use a Paid Worker or the Node/Docker runtime.

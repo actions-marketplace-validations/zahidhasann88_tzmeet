@@ -1,0 +1,145 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`fixed CLI output > snapshots JSON with the same ranked, top-capped data 1`] = `
+{
+  "diagnostics": {
+    "constraints": [
+      {
+        "constraint": "quiet",
+        "count": 22,
+        "label": "New York",
+        "zoneId": "America/New_York",
+      },
+      {
+        "constraint": "weekend",
+        "count": 22,
+        "label": "New York",
+        "zoneId": "America/New_York",
+      },
+      {
+        "constraint": "quiet",
+        "count": 22,
+        "label": "Dhaka",
+        "zoneId": "Asia/Dhaka",
+      },
+      {
+        "constraint": "quiet",
+        "count": 22,
+        "label": "London",
+        "zoneId": "Europe/London",
+      },
+      {
+        "constraint": "weekend",
+        "count": 12,
+        "label": "London",
+        "zoneId": "Europe/London",
+      },
+    ],
+    "message": "4 slots found; 44 of 48 candidates rejected.",
+    "mostRestrictive": {
+      "constraint": "quiet",
+      "count": 22,
+      "label": "New York",
+      "zoneId": "America/New_York",
+    },
+    "rejectedCandidates": 44,
+    "scannedCandidates": 48,
+    "suggestion": "Relax the early/late quiet-hour cutoff for New York, shorten the meeting, or try a different week.",
+  },
+  "range": {
+    "end": "2026-11-02T18:00:00.000Z",
+    "start": "2026-11-01T18:00:00.000Z",
+  },
+  "slots": [
+    {
+      "baseScore": 5,
+      "date": "2026-11-02",
+      "end": "2026-11-02T14:30:00.000Z",
+      "reason": "Ideal for New York & London, after work (acceptable) for Dhaka",
+      "score": 5.023124999999999,
+      "start": "2026-11-02T14:00:00.000Z",
+      "zones": [
+        {
+          "classification": "acceptable",
+          "formattedEnd": "Mon 2 Nov 2026, 20:30 GMT+6",
+          "formattedStart": "Mon 2 Nov 2026, 20:00 GMT+6",
+          "id": "Asia/Dhaka",
+          "label": "Dhaka",
+          "localEnd": "2026-11-02T20:30:00.000+06:00",
+          "localStart": "2026-11-02T20:00:00.000+06:00",
+        },
+        {
+          "classification": "ideal",
+          "formattedEnd": "Mon 2 Nov 2026, 09:30 EST",
+          "formattedStart": "Mon 2 Nov 2026, 09:00 EST",
+          "id": "America/New_York",
+          "label": "New York",
+          "localEnd": "2026-11-02T09:30:00.000-05:00",
+          "localStart": "2026-11-02T09:00:00.000-05:00",
+        },
+        {
+          "classification": "ideal",
+          "formattedEnd": "Mon 2 Nov 2026, 14:30 GMT",
+          "formattedStart": "Mon 2 Nov 2026, 14:00 GMT",
+          "id": "Europe/London",
+          "label": "London",
+          "localEnd": "2026-11-02T14:30:00.000+00:00",
+          "localStart": "2026-11-02T14:00:00.000+00:00",
+        },
+      ],
+    },
+    {
+      "baseScore": 5,
+      "date": "2026-11-02",
+      "end": "2026-11-02T15:00:00.000Z",
+      "reason": "Ideal for New York & London, after work (acceptable) for Dhaka",
+      "score": 5.020625,
+      "start": "2026-11-02T14:30:00.000Z",
+      "zones": [
+        {
+          "classification": "acceptable",
+          "formattedEnd": "Mon 2 Nov 2026, 21:00 GMT+6",
+          "formattedStart": "Mon 2 Nov 2026, 20:30 GMT+6",
+          "id": "Asia/Dhaka",
+          "label": "Dhaka",
+          "localEnd": "2026-11-02T21:00:00.000+06:00",
+          "localStart": "2026-11-02T20:30:00.000+06:00",
+        },
+        {
+          "classification": "ideal",
+          "formattedEnd": "Mon 2 Nov 2026, 10:00 EST",
+          "formattedStart": "Mon 2 Nov 2026, 09:30 EST",
+          "id": "America/New_York",
+          "label": "New York",
+          "localEnd": "2026-11-02T10:00:00.000-05:00",
+          "localStart": "2026-11-02T09:30:00.000-05:00",
+        },
+        {
+          "classification": "ideal",
+          "formattedEnd": "Mon 2 Nov 2026, 15:00 GMT",
+          "formattedStart": "Mon 2 Nov 2026, 14:30 GMT",
+          "id": "Europe/London",
+          "label": "London",
+          "localEnd": "2026-11-02T15:00:00.000+00:00",
+          "localStart": "2026-11-02T14:30:00.000+00:00",
+        },
+      ],
+    },
+  ],
+  "totalSlots": 4,
+}
+`;
+
+exports[`fixed CLI output > snapshots the table with all local dates/offsets and classification markers 1`] = `
+"tzmeet | 30-minute meetings | 30-minute grid
+Showing 2 of 4 slots. * ideal / ~ acceptable
+
+Rank | Date (first zone) | Dhaka (Asia/Dhaka)            | New York (America/New_York)   | London (Europe/London)        | Reason
+-----+-------------------+-------------------------------+-------------------------------+-------------------------------+---------------------------------------------------------------
+1    | 2026-11-02        | Mon 2 Nov 20:00-20:30 +0600 ~ | Mon 2 Nov 09:00-09:30 -0500 * | Mon 2 Nov 14:00-14:30 +0000 * | Ideal for New York & London, after work (acceptable) for Dhaka
+2    | 2026-11-02        | Mon 2 Nov 20:30-21:00 +0600 ~ | Mon 2 Nov 09:30-10:00 -0500 * | Mon 2 Nov 14:30-15:00 +0000 * | Ideal for New York & London, after work (acceptable) for Dhaka
+
+Date column uses the first zone. Each zone shows its own local date and UTC offset.
+4 slots found; 44 of 48 candidates rejected.
+"
+`;

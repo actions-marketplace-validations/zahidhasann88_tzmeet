@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "paths": { "@tzmeet/core": ["./packages/core/src/index.ts"] }
+  },
+  "include": ["packages/*/test/**/*.ts", "apps/web/test/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+}

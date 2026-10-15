@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+.vite/
+coverage/
+playwright-report/
+test-results/
+.env*
+*.tsbuildinfo
+*.tgz
+release-artifacts/
+
+# Worker tooling and local secrets
+**/.wrangler/
+**/.dev.vars*
+
+/build-docs.txt

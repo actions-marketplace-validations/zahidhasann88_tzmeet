@@ -1,0 +1,36 @@
+{
+  "zones": [
+    {
+      "id": "Asia/Dhaka",
+      "label": "Dhaka",
+      "workStart": "09:00",
+      "workEnd": "18:00",
+      "weekend": [5, 6],
+      "quietBefore": "08:00",
+      "quietAfter": "21:00"
+    },
+    {
+      "id": "America/New_York",
+      "label": "New York",
+      "workStart": "09:00",
+      "workEnd": "18:00",
+      "weekend": [6, 7],
+      "quietBefore": "08:00",
+      "quietAfter": "21:00"
+    },
+    {
+      "id": "Europe/London",
+      "label": "London",
+      "workStart": "09:00",
+      "workEnd": "18:00",
+      "weekend": [6, 7],
+      "quietBefore": "08:00",
+      "quietAfter": "21:00"
+    }
+  ],
+  "startDate": "2026-11-02",
+  "days": 5,
+  "durationMinutes": 30,
+  "stepMinutes": 15,
+  "top": 10
+}

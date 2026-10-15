@@ -1,0 +1,81 @@
+name: Deploy static web app to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+
+jobs:
+  build:
+    name: Verify and build Pages export
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Read Pages site metadata
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Build the static app at its real Pages path
+        run: pnpm --filter @tzmeet/web build
+        env:
+          TZMEET_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+      - run: pnpm --filter @tzmeet/web exec playwright install --with-deps chromium
+      - name: Test the exact export that will be uploaded
+        run: pnpm test:e2e
+        env:
+          TZMEET_E2E_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          TZMEET_E2E_SKIP_BUILD: '1'
+      - name: Upload static files only
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+      - name: Upload browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-browser-failure-traces
+          path: apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deploy:
+    name: Deploy verified static export
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
