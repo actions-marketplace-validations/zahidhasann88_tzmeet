@@ -122,7 +122,7 @@ jobs:
           docker run -d --name tzmeet-api-check -p 127.0.0.1:3000:3000 tzmeet-api:ci
           trap 'docker rm -f tzmeet-api-check' EXIT
           test "$(docker inspect --format '{{.Config.User}}' tzmeet-api-check)" = node
-          for attempt in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:3000/v1/health; then exit 0; fi
             sleep 2
           done
