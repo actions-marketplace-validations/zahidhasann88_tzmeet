@@ -1,228 +1,95 @@
 # tzmeet
 
-Find meeting times that work for a team spread across time zones.
+Find a meeting time that works for everyone on a team spread across time zones.
 
-**[Try it live →](https://zahidhasann88.github.io/tzmeet/)** · CLI on npm: [`tzmeet`](https://www.npmjs.com/package/tzmeet) · [API docs](https://tzmeet-api.onrender.com/docs)
+**[Try it live →](https://zahidhasann88.github.io/tzmeet/)**
 
 ![Shared 24-hour timeline for Dhaka, London and New York](docs/screenshots/demo.png)
 
+## What it does
+
+Add your team's cities. tzmeet looks through the week and shows the best meeting times, so nobody has to join:
+
+- in the middle of the night
+- on their weekend or a holiday
+- during prayer time (optional)
+
+Each result shows the time in every city, marked as **ideal** (during work hours) or **acceptable** (a bit early or late, but still reasonable). You can copy the invite text or download a calendar (`.ics`) file.
+
 ![Ranked meeting times with ideal and acceptable labels for each zone](docs/screenshots/result.png)
 
-You give it the zones, each team's working hours and weekend, and optionally prayer times. It scans the week and ranks the slots where nobody is asked to join at 2 a.m., on their weekend, or during prayer.
+## Ways to use it
 
-It comes in four pieces that all share one core library:
+### 1. Web app (easiest)
 
-| Package | What it is |
-| --- | --- |
-| `packages/core` | The scheduling engine. Pure TypeScript, runs in Node and the browser. |
-| `packages/cli` | `tzmeet` command-line tool (Node 20+). |
-| `apps/web` | Static web app (Vite + React + Tailwind). No backend, no tracking. |
-| `packages/api` | Optional stateless REST API (Hono), for Docker or Cloudflare Workers. |
+Open **[zahidhasann88.github.io/tzmeet](https://zahidhasann88.github.io/tzmeet/)**. Nothing to install. Everything runs in your browser, and no data is sent anywhere.
 
-## Getting started
+### 2. Command line
 
-You need Node 20+ and pnpm 10.
+Needs Node 20 or newer.
 
 ```sh
-pnpm install
-pnpm test        # unit tests
-pnpm build       # builds every package
-pnpm dev         # web app at http://localhost:5173
+npx tzmeet --zones Asia/Dhaka,Europe/London,America/New_York --date 2026-11-02
 ```
 
-Other useful commands: `pnpm lint`, `pnpm typecheck`, `pnpm test:e2e` (Playwright; run `pnpm --filter @tzmeet/web exec playwright install chromium` once first).
+```
+Rank | Date (first zone) | Dhaka (Asia/Dhaka)            | London (Europe/London)        | New York (America/New_York)   | Reason
+1    | 2026-11-02        | Mon 2 Nov 20:00-20:30 +0600 ~ | Mon 2 Nov 14:00-14:30 +0000 * | Mon 2 Nov 09:00-09:30 -0500 * | ...
+```
 
-## CLI
+`*` = ideal, `~` = acceptable. Run `npx tzmeet --help` for all options, or see the [CLI guide](packages/cli/README.md).
 
-Try it without installing anything:
+### 3. REST API
+
+A free demo runs at **https://tzmeet-api.onrender.com** ([interactive docs](https://tzmeet-api.onrender.com/docs)). The first request may take up to a minute while it wakes up.
 
 ```sh
-npx tzmeet --zones Asia/Dhaka,Europe/London --date 2026-11-02
+curl "https://tzmeet-api.onrender.com/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&format=text"
 ```
 
-Or install it with `npm install --global tzmeet`:
+See the [API guide](packages/api/README.md) to run your own.
 
-```sh
-tzmeet --zones Asia/Dhaka,America/New_York,Europe/London \
-  --date 2026-11-02 --duration 30 --top 2
-```
-
-```
-Rank | Date (first zone) | Dhaka (Asia/Dhaka)            | New York (America/New_York)   | London (Europe/London)        | Reason
------+-------------------+-------------------------------+-------------------------------+-------------------------------+---------------------------------------------------------------
-1    | 2026-11-02        | Mon 2 Nov 20:00-20:30 +0600 ~ | Mon 2 Nov 09:00-09:30 -0500 * | Mon 2 Nov 14:00-14:30 +0000 * | Ideal for New York & London, after work (acceptable) for Dhaka
-2    | 2026-11-02        | Mon 2 Nov 20:15-20:45 +0600 ~ | Mon 2 Nov 09:15-09:45 -0500 * | Mon 2 Nov 14:15-14:45 +0000 * | Ideal for New York & London, after work (acceptable) for Dhaka
-```
-
-`*` means inside work hours, `~` means outside work hours but still reasonable.
-
-Useful flags:
-
-- `--days 5` sets how many days to search, and `--top 10` how many results to show.
-- `--work 09:00-18:00` sets work hours for everyone. `--zone-work America/New_York=08:00-17:00` overrides one zone.
-- `--quiet 08:00-21:00` sets the earliest and latest acceptable times.
-- `--holiday Asia/Dhaka=2026-12-16,2026-12-25` blocks those local dates for one zone.
-- `--weekend Europe/London=none` sets one zone's weekend. Dhaka and other Fri/Sat regions already default to Fri/Sat.
-- `--prayer-location Dhaka --prayer-method Karachi --prayer-buffer 10` turns on prayer times.
-- `--json` prints machine-readable output. `--config path` loads a config file.
-- `tzmeet zones london` searches time zone names.
-
-If a `tzmeet.config.json` exists in the current directory it is loaded automatically, and flags override it. See [`examples/tzmeet.config.json`](examples/tzmeet.config.json).
-
-Exit code is `1` for invalid input. Finding no slots is not an error: you get exit `0` and an explanation of what blocked them.
-
-To run it from a clone of this repo:
-
-```sh
-pnpm build
-node packages/cli/dist/bin.js --help
-```
-
-## Web app
-
-`pnpm dev` runs it locally. `pnpm --filter @tzmeet/web build` writes static files to `apps/web/out`, which you can host anywhere.
-
-What it does:
-
-- Add, remove and reorder zones, each with its own work hours, weekend and quiet hours. Sensible defaults are filled in, e.g. Fri/Sat weekend for Dhaka.
-- Pick the date, meeting length, number of days, and optional prayer times.
-- See ranked slots, plus a 24-hour timeline that shows every zone on the same UTC axis.
-- Copy invite text or download an `.ics` file for any slot.
-- Share the exact setup via the URL. Your last settings are also remembered locally.
-
-Everything runs in the browser. After the page loads it makes no network requests.
-
-## Library
+### 4. JavaScript / TypeScript library
 
 ```ts
 import { findSlots } from '@tzmeet/core';
 
 const result = findSlots({
-  zones: [
-    { id: 'Asia/Dhaka', label: 'Dhaka' },              // Fri/Sat weekend by default
-    { id: 'America/New_York', label: 'New York' },
-    { id: 'Europe/London', label: 'London' },
-  ],
+  zones: [{ id: 'Asia/Dhaka' }, { id: 'Europe/London' }],
   startDate: '2026-11-02',
-  durationMinutes: 30,
 });
-
-for (const slot of result.slots.slice(0, 5)) {
-  console.log(slot.reason, slot.zones.map(z => z.formattedStart));
-}
-if (result.slots.length === 0) {
-  console.log(result.diagnostics.message, result.diagnostics.suggestion);
-}
+console.log(result.slots[0]);
 ```
 
-Defaults are 09:00–18:00 work hours, 08:00–21:00 quiet hours, a Sat/Sun weekend (`[6, 7]`, ISO weekdays), 5 days, 30-minute meetings and a 15-minute step. Countries with a Friday/Saturday weekend default to `[5, 6]` instead: Bangladesh, Saudi Arabia, Qatar, Kuwait, Bahrain, Israel, Egypt, Jordan, Oman, Iraq, Algeria, Yemen, Sudan, Libya, Syria and the Maldives.
+See the [library guide](packages/core/README.md).
 
-Other exports include `validateInput()`, `listTimeZones()`, `convertTime()`, `getPrayerWindows()`, `classifySpan()`, and the zod schemas (`findSlotsSchema`, `configSchema`) used by the CLI, web app and API. See [packages/core/README.md](packages/core/README.md).
+## Defaults
 
-## How slots are scored
+- Work hours: 09:00–18:00
+- Acceptable hours: 08:00–21:00
+- Weekend: Saturday–Sunday (Friday–Saturday for Bangladesh, Saudi Arabia, Egypt and other Fri/Sat countries)
+- Meeting length: 30 minutes, searching 5 days
 
-1. The date range starts at midnight on `startDate` **in the first zone** and covers `days` calendar days.
-2. Candidate start times are scanned in UTC every `stepMinutes`. All time zone conversion goes through Luxon, so DST changes are handled correctly, including the weeks when the US and UK change clocks on different dates.
-3. For each zone, the whole meeting is checked, not just its start. A slot that crosses midnight, a work-hour boundary or a DST change is judged by its whole span. Each zone's verdict is one of:
-   - **ideal**: entirely inside work hours
-   - **acceptable**: outside work hours but inside quiet hours (e.g. 08:00–09:00 or 18:00–21:00)
-   - **blocked**: falls on a weekend or a listed holiday, before/after quiet hours, or overlaps a prayer time ± buffer
-4. A slot is returned only if **no zone is blocked**.
-5. Score = 2 per ideal zone + 1 per acceptable zone, plus a small tie-break (at most 0.09) that prefers earlier slots and times near the middle of the first zone's work day. Results are sorted by score.
+You can change all of these for each city.
 
-Boundaries are inclusive: a meeting ending exactly at 18:00 is still ideal. Windows can run past midnight for night shifts: work `22:00`–`06:00` inside allowed `20:00`–`08:00` is valid. Weekends and holidays still apply per local calendar day.
+## Good to know
 
-If nothing fits, the result explains which constraint rejected the most candidates and suggests what to relax.
+- Prayer times are calculated and approximate. Check your local mosque timetable.
+- Holidays must be added yourself. tzmeet doesn't read your calendar.
 
-## API
+## For developers
 
-The API wraps the same core; it doesn't add any scheduling logic of its own.
-
-A public demo runs at **https://tzmeet-api.onrender.com**, with interactive docs at [/docs](https://tzmeet-api.onrender.com/docs). It's on a free plan, so the first request after a quiet period can take up to a minute while it wakes up. Try it:
+You need Node 20+ and pnpm 10.
 
 ```sh
-curl "https://tzmeet-api.onrender.com/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&top=3&format=text"
+pnpm install
+pnpm dev     # web app at http://localhost:5173
+pnpm test    # run tests
+pnpm build   # build everything
 ```
 
-To run it locally:
-
-```sh
-pnpm --filter @tzmeet/api... build
-pnpm --filter @tzmeet/api start     # http://localhost:3000, interactive docs at /docs
-```
-
-| Endpoint | Description |
-| --- | --- |
-| `POST /v1/slots` | Body is the same input as `findSlots()`. Add `?top=10&format=json\|text\|ics`. |
-| `GET /v1/slots` | Same search via query params, using the CLI flag syntax (e.g. `&holiday=Asia/Dhaka=2026-12-16`). |
-| `GET /v1/zones?search=dhaka` | Time zone search with current UTC offsets. |
-| `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a local time. |
-| `GET /v1/health` | Health check. |
-| `GET /openapi.json`, `GET /docs` | OpenAPI spec and interactive docs. |
-
-Limits: 32 KB body, 8 zones, 14 days, 50 results.
-
-```sh
-# Simple search
-curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,America/New_York,Europe/London&date=2026-11-02&top=5"
-
-# Per-zone rules and a prayer buffer
-curl http://localhost:3000/v1/slots -H 'Content-Type: application/json' -d '{
-  "zones": [
-    {"id": "Asia/Dhaka", "workStart": "10:00", "workEnd": "17:00"},
-    {"id": "Europe/London"},
-    {"id": "America/New_York", "workStart": "08:00", "workEnd": "17:00"}
-  ],
-  "startDate": "2026-11-02",
-  "prayer": {"location": "Dhaka", "method": "Karachi", "bufferMinutes": 10}
-}'
-
-# Download a calendar file
-curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&format=ics" -o meetings.ics
-```
-
-Errors always look like this:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "zones[1].id: 'Asia/Dakha' is not a valid IANA time zone. Did you mean 'Asia/Dhaka'?",
-    "details": [{ "field": "zones[1].id", "message": "...", "suggestion": "Asia/Dhaka" }]
-  }
-}
-```
-
-From TypeScript:
-
-```ts
-const params = new URLSearchParams({ zones: 'Asia/Dhaka,Europe/London', date: '2026-11-02' });
-const res = await fetch(`http://localhost:3000/v1/slots?${params}`);
-const body = await res.json();
-if (!res.ok) throw new Error(body.error.message);
-console.log(body.slots);
-```
-
-From Python:
-
-```python
-import requests
-
-res = requests.get('http://localhost:3000/v1/slots',
-                   params={'zones': 'Asia/Dhaka,Europe/London', 'date': '2026-11-02'})
-res.raise_for_status()
-print(res.json()['slots'])
-```
-
-API keys, CORS, rate limiting and caching are configured with environment variables. See [packages/api/README.md](packages/api/README.md).
-
-## Known limitations
-
-- Prayer times are calculated astronomically and are approximate. They are not a substitute for a local mosque timetable, and Ramadan adjustments aren't applied.
-- Holidays have to be listed per zone; there's no built-in holiday calendar, and existing calendar events aren't considered.
-- Time zone rules come from the Node/browser runtime, so keep it up to date.
-- Searches in the web app run on the main thread; very large ranges can feel slow on low-end phones.
+The code is split into `packages/core` (scheduling engine), `packages/cli`, `packages/api` and `apps/web`.
 
 ## License
 
-[MIT](LICENSE). See [CHANGELOG.md](CHANGELOG.md) for release history.
+[MIT](LICENSE). Release history is in [CHANGELOG.md](CHANGELOG.md).
