@@ -4,6 +4,10 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ## [Unreleased]
 
+### Removed
+
+- Dependabot configuration.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added
