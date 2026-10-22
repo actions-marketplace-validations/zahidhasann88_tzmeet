@@ -1,5 +1,15 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`cron --check > finds DST problems in crontabs and CronJobs, with file and line, and exits 1 1`] = `
+"crontab:4: error: On 2027-03-14 in America/New_York, clocks jump from 02:00 to 03:00. Unix cron runs the 02:30 job right after the change, at 03:00. [30 2 * * * in America/New_York]
+k8s/jobs.yaml:6: error: cleanup: On 2026-10-25 in Europe/London, clocks go back from 02:00 to 01:00, so the 01:30 run happens twice. [30 1 * * * in Europe/London]
+k8s/jobs.yaml:6: error: cleanup: On 2027-03-28 in Europe/London, clocks jump from 01:00 to 02:00, so the 01:30 run doesn't happen that day. [30 1 * * * in Europe/London]
+k8s/jobs.yaml:15: warning: report: no spec.timeZone, so Kubernetes uses the kube-controller-manager's time zone (often UTC). Set spec.timeZone to make the schedule explicit. [0 6 13 * 5]
+k8s/jobs.yaml:15: warning: report: Both day-of-month (13) and day-of-week (5) are set, so Kubernetes CronJob runs when either one matches, not only when both do. [0 6 13 * 5 in UTC]
+Checked 5 schedules in 2 files: 3 errors, 2 warnings.
+"
+`;
+
 exports[`cron subcommand > prints a run table in the default zones with DST notes and warnings 1`] = `
 "30 2 * * *  (Unix cron, runs in America/New_York)
 At 02:30

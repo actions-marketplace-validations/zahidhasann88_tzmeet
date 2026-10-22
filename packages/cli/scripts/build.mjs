@@ -12,16 +12,18 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  // Only commander remains a runtime dependency. Core/Luxon/adhan/zod are bundled.
+  // Only commander remains a runtime dependency. Core/Luxon/adhan/zod/yaml are bundled.
   external: ['commander'],
   sourcemap: true,
-  legalComments: 'linked'
+  legalComments: 'linked',
+  // Bundled CommonJS packages (yaml) call require() for Node built-ins.
+  banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" }
 });
 await chmod(`${root}/dist/bin.js`, 0o755);
 await copyFile(`${root}/../../LICENSE`, `${root}/LICENSE`);
 const notices = ['Third-party licenses bundled with tzmeet.\n'];
-for (const [name, filename] of [['luxon', 'LICENSE.md'], ['adhan', 'LICENSE'], ['zod', 'LICENSE']]) {
-  const license = await readFile(`${root}/../core/node_modules/${name}/${filename}`, 'utf8');
+for (const [name, filename, from] of [['luxon', 'LICENSE.md', 'core'], ['adhan', 'LICENSE', 'core'], ['zod', 'LICENSE', 'core'], ['yaml', 'LICENSE', 'cli']]) {
+  const license = await readFile(`${root}/../${from}/node_modules/${name}/${filename}`, 'utf8');
   notices.push(`===== ${name} =====\n${license}`);
 }
 await writeFile(`${root}/dist/THIRD_PARTY_NOTICES.txt`, notices.join('\n\n'));

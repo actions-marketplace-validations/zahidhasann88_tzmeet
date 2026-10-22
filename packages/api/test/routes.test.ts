@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   explainCron,
+  convertCronZone,
   findSlots,
   parseScheduleInput,
   recurringImpact,
@@ -10,6 +11,7 @@ import { API_VERSION, createApp } from "../src/app.js";
 import {
   conversionResultSchema,
   cronResultSchema,
+  cronConvertResultSchema,
   errorSchema,
   recurringResultSchema,
   healthSchema,
@@ -914,5 +916,33 @@ describe('optional attendees over HTTP', () => {
     expect(optional.slots.some(slot => slot.zones[2]!.classification === 'blocked' && slot.zones[2]!.optional)).toBe(true);
     const posted = slotsResultSchema.parse(await (await post({ zones: [{ id: 'Europe/London' }, { id: 'America/New_York', optional: true }], startDate: '2026-11-02', days: 1 })).json());
     expect(posted.slots[0]!.zones[1]!.optional).toBe(true);
+  });
+});
+
+describe('cron conversion over HTTP', () => {
+  const convert = (query: Record<string, string>) => app.request(`/v1/cron/convert?${new URLSearchParams(query)}`);
+
+  it('converts syntax and time zone, matching core', async () => {
+    const response = await convert({ expression: '0 9 * * 1-5', to: 'quartz', zone: 'Asia/Dhaka', toZone: 'UTC', from: '2026-10-23T00:00:00Z' });
+    expect(response.status).toBe(200);
+    const body = cronConvertResultSchema.parse(await response.json());
+    expect(body.dialect!.expressions).toEqual(['0 0 9 ? * MON-FRI']);
+    expect(body.zone).toEqual(convertCronZone({ expression: '0 9 * * 1-5', fromZone: 'Asia/Dhaka', toZone: 'UTC', from: '2026-10-23T00:00:00Z' }));
+  });
+
+  it('returns only what was asked for', async () => {
+    const body = cronConvertResultSchema.parse(await (await convert({ expression: '0 0 0 13 * FRI', dialect: 'spring', to: 'unix' })).json());
+    expect(body.zone).toBeUndefined();
+    expect(body.dialect).toMatchObject({ expressions: [], problems: [expect.stringContaining("can't require both")] });
+  });
+
+  it.each([
+    [{ expression: '0 9 * * *' }, 'to'],
+    [{ expression: '0 9 * * *', to: 'cronie' }, 'to'],
+    [{ expression: '0 99 * * *', to: 'quartz' }, 'expression.hour'],
+    [{ expression: '0 9 * * *', toZone: 'Mars/Base' }, 'toZone']
+  ])('rejects %j', async (query, field) => {
+    const error = await publicError(await convert(query));
+    expect(error.details).toContainEqual(expect.objectContaining({ field }));
   });
 });

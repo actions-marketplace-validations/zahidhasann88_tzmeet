@@ -33,7 +33,7 @@ try {
   assert.equal(readFileSync(executable, 'utf8').startsWith('#!/usr/bin/env node'), true);
   assert.ok(readFileSync(join(packageRoot, 'LICENSE'), 'utf8').includes('MIT License'));
   const notices = readFileSync(join(packageRoot, 'dist/THIRD_PARTY_NOTICES.txt'), 'utf8');
-  for (const dependency of ['luxon', 'adhan', 'zod']) assert.ok(notices.includes(`===== ${dependency} =====`));
+  for (const dependency of ['luxon', 'adhan', 'zod', 'yaml']) assert.ok(notices.includes(`===== ${dependency} =====`));
   function run(args, expectedCode = 0) {
     const result = spawnSync(process.execPath, [executable, ...args], { cwd: empty, encoding: 'utf8' });
     assert.equal(result.status, expectedCode, result.stderr);

@@ -11,6 +11,8 @@ import {
   inviteText,
   convertTime,
   explainCron,
+  convertCronDialect,
+  convertCronZone,
   findSlots,
   getTimeZoneInfo,
   listTimeZones,
@@ -37,6 +39,8 @@ import {
   convertQuerySchema,
   conversionResultSchema,
   cronQuerySchema,
+  cronConvertQuerySchema,
+  cronConvertResultSchema,
   cronResultSchema,
   errorSchema,
   recurringQuerySchema,
@@ -214,6 +218,22 @@ const getCron = createRoute({
     ...errorResponses,
   },
 });
+const getCronConvert = createRoute({
+  method: "get",
+  path: "/v1/cron/convert",
+  tags: ["Cron"],
+  summary:
+    "Convert a cron expression to another syntax (Unix, Kubernetes, Spring, Quartz) and/or time zone",
+  request: { query: cronConvertQuerySchema },
+  responses: {
+    200: {
+      description:
+        "Converted expressions with problems and notes; zone conversions list one expression per DST period plus the native time-zone setting",
+      content: json(cronConvertResultSchema),
+    },
+    ...errorResponses,
+  },
+});
 const getRecurring = createRoute({
   method: "get",
   path: "/v1/recurring",
@@ -245,6 +265,7 @@ const methods: Record<string, readonly string[]> = {
   "/v1/zones": ["GET", "HEAD"],
   "/v1/convert": ["GET", "HEAD"],
   "/v1/cron": ["GET", "HEAD"],
+  "/v1/cron/convert": ["GET", "HEAD"],
   "/v1/recurring": ["GET", "HEAD"],
   "/v1/health": ["GET", "HEAD"],
   "/openapi.json": ["GET", "HEAD"],
@@ -355,7 +376,13 @@ export function createApp(options: AppOptions = {}) {
         slots: selected,
         diagnostics: result.diagnostics,
         // The rotation looks at every slot found, not only the returned `top`.
-        ...(rotation ? { rotation: fairRotation(result, { size: Number(rotation) as 2 | 3 }) } : {}),
+        ...(rotation
+          ? {
+              rotation: fairRotation(result, {
+                size: Number(rotation) as 2 | 3,
+              }),
+            }
+          : {}),
         meta: {
           count: selected.length,
           generatedAt: now().toISOString(),
@@ -464,6 +491,36 @@ export function createApp(options: AppOptions = {}) {
       );
     }
   });
+  app.openapi(getCronConvert, (c) => {
+    const { expression, dialect, to, zone, toZone, from } =
+      c.req.valid("query");
+    if (from && !options.apiKeys?.length)
+      c.header("Cache-Control", "public, max-age=300");
+    return c.json(
+      {
+        ...(to
+          ? {
+              dialect: convertCronDialect(expression, {
+                ...(dialect ? { from: dialect } : {}),
+                to,
+              }),
+            }
+          : {}),
+        ...(toZone
+          ? {
+              zone: convertCronZone({
+                expression,
+                ...(dialect ? { dialect } : {}),
+                fromZone: zone ?? "UTC",
+                toZone,
+                from: from ?? now().toISOString(),
+              }),
+            }
+          : {}),
+      },
+      200,
+    );
+  });
   app.openapi(getRecurring, (c) => {
     const { time, weeks, ...query } = c.req.valid("query");
     const input = parseScheduleInput({
@@ -476,7 +533,8 @@ export function createApp(options: AppOptions = {}) {
       ramadan: array(query.ramadan),
       optional: array(query.optional),
     });
-    if (!options.apiKeys?.length) c.header("Cache-Control", "public, max-age=300");
+    if (!options.apiKeys?.length)
+      c.header("Cache-Control", "public, max-age=300");
     return c.json(
       recurringImpact({
         zones: input.zones,
@@ -577,6 +635,7 @@ export function createApp(options: AppOptions = {}) {
       ["/v1/zones", "zones"],
       ["/v1/convert", "convert"],
       ["/v1/cron", "cron"],
+      ["/v1/cron/convert", "cronConvert"],
       ["/v1/recurring", "recurring"],
       ["/v1/health", "health"],
     ] as const) {

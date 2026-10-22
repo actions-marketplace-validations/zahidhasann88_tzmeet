@@ -589,13 +589,11 @@ test("remembers an imported calendar on this device only when asked", async ({
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
-  await page
-    .getByLabel("London busy calendar")
-    .setInputFiles({
-      name: "london.ics",
-      mimeType: "text/calendar",
-      buffer: Buffer.from(ics),
-    });
+  await page.getByLabel("London busy calendar").setInputFiles({
+    name: "london.ics",
+    mimeType: "text/calendar",
+    buffer: Buffer.from(ics),
+  });
   await page.getByLabel("Remember London busy calendar on this device").check();
   await page.reload();
   await expect(page.locator(".calendar-status")).toContainText(
@@ -610,4 +608,39 @@ test("remembers an imported calendar on this device only when asked", async ({
   await page.reload();
   await expect(page.getByLabel("London busy calendar")).toBeVisible();
   await expect(page.locator(".calendar-status")).toHaveCount(0);
+});
+
+test("converts a cron schedule to another syntax and server time zone", async ({
+  page,
+}) => {
+  await mockClipboard(page);
+  await page.goto(
+    "./#/cron?e=30+2+*+*+*&d=unix&z=America%2FNew_York&show=UTC&n=5",
+  );
+  const panel = page.getByRole("region", { name: "Convert" });
+  await panel.getByLabel("Convert to syntax").selectOption("quartz");
+  await expect(panel.locator(".convert-expression code").first()).toHaveText(
+    "0 30 2 * * ?",
+  );
+  await panel.getByLabel("Server time zone").fill("UTC");
+  await expect(panel).toContainText(
+    "UTC is 4 or 5 hours ahead of America/New_York",
+  );
+  await expect(panel.locator(".convert-native")).toHaveText(
+    "CRON_TZ=America/New_York\n30 2 * * *",
+  );
+  await panel.getByRole("button", { name: "Copy 0 30 2 * * ?" }).click();
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.clipboard),
+  ).toBe("0 30 2 * * ?");
+  const audit = await new AxeBuilder({ page })
+    .include(".convert-panel")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });

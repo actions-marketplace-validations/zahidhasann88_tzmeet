@@ -2388,4 +2388,72 @@ input[aria-invalid="true"] {
 .rotation-time .badge {
   justify-self: start;
 }
-.badge-optional { background: transparent; border-color: var(--line); color: var(--muted); }
+.badge-optional {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.convert-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 22px;
+  display: grid;
+  gap: 12px;
+}
+.convert-panel h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.convert-result {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.convert-expression {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.convert-expression code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  overflow-wrap: anywhere;
+}
+.convert-period {
+  display: grid;
+  gap: 4px;
+}
+.convert-period > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.convert-problem {
+  font-size: 12px;
+  color: #b4532a;
+}
+:root[data-theme="dark"] .convert-problem {
+  color: #f0a678;
+}
+.convert-native {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.convert-panel .full-field {
+  margin: 0;
+}

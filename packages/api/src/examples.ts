@@ -1,6 +1,8 @@
 import {
   convertTime,
   explainCron,
+  convertCronDialect,
+  convertCronZone,
   findSlots,
   getTimeZoneInfo,
   recurringImpact,
@@ -51,6 +53,19 @@ export function responseExamples(version: string) {
       time: "14:00",
       weeks: 3,
     }),
+    cronConvert: {
+      dialect: convertCronDialect("0 9 * * 1-5", {
+        from: "unix",
+        to: "quartz",
+      }),
+      zone: convertCronZone({
+        expression: "0 9 * * 1-5",
+        dialect: "unix",
+        fromZone: "Asia/Dhaka",
+        toZone: "UTC",
+        from: "2026-10-23T00:00:00Z",
+      }),
+    },
     health: { status: "ok", version },
   };
 }

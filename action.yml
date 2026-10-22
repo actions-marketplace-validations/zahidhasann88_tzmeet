@@ -1,0 +1,41 @@
+name: tzmeet cron check
+description: Fail pull requests on cron schedules that daylight saving skips or runs twice (crontabs and Kubernetes CronJobs).
+author: zahidhasann88
+branding:
+  icon: clock
+  color: green
+
+inputs:
+  paths:
+    description: Files or folders to scan, separated by spaces. Folders are searched for *.yaml, *.yml, crontab, *.crontab and *.cron files.
+    required: false
+    default: .
+  zone:
+    description: IANA time zone for crontabs without CRON_TZ and CronJobs without spec.timeZone.
+    required: false
+    default: UTC
+  strict:
+    description: Also fail on warnings (for example a CronJob without spec.timeZone).
+    required: false
+    default: "false"
+  version:
+    description: tzmeet version to run from npm.
+    required: false
+    default: "0.3.0"
+
+runs:
+  using: composite
+  steps:
+    - name: Check cron schedules
+      shell: bash
+      env:
+        TZMEET_PATHS: ${{ inputs.paths }}
+        TZMEET_ZONE: ${{ inputs.zone }}
+        TZMEET_STRICT: ${{ inputs.strict }}
+        TZMEET_VERSION: ${{ inputs.version }}
+      run: |
+        # Inputs arrive as environment variables, never pasted into this script.
+        read -r -a paths <<< "$TZMEET_PATHS"
+        strict=()
+        if [ "$TZMEET_STRICT" = "true" ]; then strict=(--strict); fi
+        npx --yes "tzmeet@${TZMEET_VERSION}" cron --check "${paths[@]}" --zone "$TZMEET_ZONE" --format github "${strict[@]}"

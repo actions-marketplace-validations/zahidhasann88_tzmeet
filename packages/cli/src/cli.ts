@@ -1,6 +1,9 @@
 import { Command, CommanderError } from "commander";
 import {
   explainCron,
+  convertCronDialect,
+  convertCronZone,
+  cronDialects,
   findSlots,
   listTimeZones,
   parseIntegerOption,
@@ -10,7 +13,8 @@ import {
 } from "@tzmeet/core";
 import { readConfig, resolveOptions, type CliFlags } from "./config.js";
 import { formatRotation, formatTable, selectTop } from "./output.js";
-import { defaultCronZones, formatCron } from "./cron.js";
+import { defaultCronZones, formatConversion, formatCron } from "./cron.js";
+import { checkCronFiles, formatCheck } from "./check.js";
 import { formatRecurring } from "./recurring.js";
 import { applyBusy } from "./busy.js";
 
@@ -30,6 +34,7 @@ export function runCLI(
   args: string[] = process.argv.slice(2),
   context: CliContext = {},
 ): number {
+  let exitCode = 0;
   const writeOut =
     context.stdout ??
     ((text) => {
@@ -162,18 +167,31 @@ No slots found is a successful search (exit 0); invalid input exits 1.
         flags,
         context.now?.() ?? new Date(),
       );
-      const busy = applyBusy(input, flags.busy, context.cwd ?? process.cwd(), input.days, writeErr);
+      const busy = applyBusy(
+        input,
+        flags.busy,
+        context.cwd ?? process.cwd(),
+        input.days,
+        writeErr,
+      );
       const found = findSlots(busy);
       const result = selectTop(found, top);
-      if (flags.rotation !== undefined && flags.rotation !== "2" && flags.rotation !== "3")
-        throw new Error(`--rotation must be 2 or 3, received ${JSON.stringify(flags.rotation)}`);
+      if (
+        flags.rotation !== undefined &&
+        flags.rotation !== "2" &&
+        flags.rotation !== "3"
+      )
+        throw new Error(
+          `--rotation must be 2 or 3, received ${JSON.stringify(flags.rotation)}`,
+        );
       const rotation = flags.rotation
         ? fairRotation(found, { size: Number(flags.rotation) as 2 | 3 })
         : undefined;
       writeOut(
         flags.json
           ? `${JSON.stringify(rotation === undefined ? result : { ...result, rotation }, null, 2)}\n`
-          : formatTable(result, input) + (rotation ? formatRotation(rotation) : ""),
+          : formatTable(result, input) +
+              (rotation ? formatRotation(rotation) : ""),
       );
     });
   program
@@ -196,7 +214,7 @@ No slots found is a successful search (exit 0); invalid input exits 1.
   program
     .command("cron <expression...>")
     .description(
-      "Explain a Unix, Kubernetes, Spring or Quartz cron expression: next runs across zones and DST warnings",
+      "Explain, convert or check cron schedules (Unix, Kubernetes, Spring, Quartz): next runs, DST warnings",
     )
     .option(
       "--dialect <name>",
@@ -209,6 +227,20 @@ No slots found is a successful search (exit 0); invalid input exits 1.
     )
     .option("--count <n>", "number of runs to list, 1-100 (default: 10)")
     .option("--from <iso>", "list runs after this instant (default: now)")
+    .option(
+      "--to <dialect>",
+      "convert to unix, kubernetes, spring or quartz syntax",
+    )
+    .option(
+      "--to-zone <id>",
+      "rewrite the schedule for a scheduler running in this zone (from --zone)",
+    )
+    .option(
+      "--check",
+      "treat the arguments as files/folders: check crontabs and Kubernetes CronJob YAML for DST problems",
+    )
+    .option("--strict", "with --check: also fail on warnings")
+    .option("--format <format>", "with --check: text or github (annotations)")
     .addHelpText(
       "after",
       `
@@ -216,6 +248,13 @@ Quote the expression so the shell doesn't expand *:
   tzmeet cron "30 2 * * *" --zone America/New_York
   tzmeet cron "0 0 9 ? * MON-FRI" --dialect quartz --zone Asia/Dhaka
   tzmeet cron "0 1 * * *" --dialect kubernetes --zone Europe/London --json
+
+Convert:
+  tzmeet cron "0 9 * * 1-5" --to quartz
+  tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
+
+Check files in CI (exit 1 on DST problems; --zone is used where none is set):
+  tzmeet cron --check k8s/ crontab --zone America/New_York --format github
 `,
     )
     .action(
@@ -227,8 +266,84 @@ Quote the expression so the shell doesn't expand *:
           display?: string;
           count?: string;
           from?: string;
+          to?: string;
+          toZone?: string;
+          check?: boolean;
+          strict?: boolean;
+          format?: string;
         },
       ) => {
+        const json = program.opts<CliFlags>().json;
+        const from =
+          options.from ?? (context.now?.() ?? new Date()).toISOString();
+        if (options.check) {
+          if (
+            options.format !== undefined &&
+            options.format !== "text" &&
+            options.format !== "github"
+          )
+            throw new Error(
+              `--format must be text or github, received ${JSON.stringify(options.format)}`,
+            );
+          const result = checkCronFiles(parts, {
+            cwd: context.cwd ?? process.cwd(),
+            zone: options.zone ?? "UTC",
+            from,
+          });
+          writeOut(
+            json
+              ? `${JSON.stringify(result, null, 2)}\n`
+              : formatCheck(
+                  result,
+                  options.format === "github" ? "github" : "text",
+                ),
+          );
+          const failing = result.findings.filter(
+            (finding) => finding.severity === "error" || options.strict,
+          );
+          if (failing.length) exitCode = 1;
+          return;
+        }
+        if (options.to !== undefined || options.toZone !== undefined) {
+          const expression = parts.join(" ");
+          const dialect = options.dialect as CronDialect | undefined;
+          if (
+            options.to !== undefined &&
+            !cronDialects.includes(options.to as CronDialect)
+          )
+            throw new Error(
+              `--to must be unix, kubernetes, spring or quartz, received ${JSON.stringify(options.to)}`,
+            );
+          const converted = {
+            ...(options.to
+              ? {
+                  dialect: convertCronDialect(expression, {
+                    ...(dialect ? { from: dialect } : {}),
+                    to: options.to as CronDialect,
+                  }),
+                }
+              : {}),
+            ...(options.toZone
+              ? {
+                  zone: convertCronZone({
+                    expression,
+                    ...(dialect ? { dialect } : {}),
+                    fromZone: options.zone ?? "UTC",
+                    toZone: options.toZone,
+                    from,
+                  }),
+                }
+              : {}),
+          };
+          writeOut(
+            json
+              ? `${JSON.stringify(converted, null, 2)}\n`
+              : formatConversion(converted),
+          );
+          if (converted.dialect && !converted.dialect.expressions.length)
+            exitCode = 1;
+          return;
+        }
         const result = explainCron({
           expression: parts.join(" "),
           ...(options.dialect
@@ -242,10 +357,10 @@ Quote the expression so the shell doesn't expand *:
                 .filter(Boolean)
             : defaultCronZones,
           count: parseIntegerOption(options.count, "count", 10),
-          from: options.from ?? (context.now?.() ?? new Date()).toISOString(),
+          from,
         });
         writeOut(
-          program.opts<CliFlags>().json
+          json
             ? `${JSON.stringify(result, null, 2)}
 `
             : formatCron(result),
@@ -272,9 +387,19 @@ Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holid
     .action((options: { time: string; weeks?: string }) => {
       const flags = program.opts<CliFlags>();
       const config = readConfig(context.cwd ?? process.cwd(), flags.config);
-      const { input } = resolveOptions(config, flags, context.now?.() ?? new Date());
+      const { input } = resolveOptions(
+        config,
+        flags,
+        context.now?.() ?? new Date(),
+      );
       const weeks = parseIntegerOption(options.weeks, "weeks", 26);
-      const busy = applyBusy(input, flags.busy, context.cwd ?? process.cwd(), weeks * 7, writeErr);
+      const busy = applyBusy(
+        input,
+        flags.busy,
+        context.cwd ?? process.cwd(),
+        weeks * 7,
+        writeErr,
+      );
       const result = recurringImpact({
         zones: busy.zones,
         startDate: input.startDate,
@@ -283,12 +408,16 @@ Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holid
         time: options.time,
         weeks,
       });
-      writeOut(flags.json ? `${JSON.stringify(result, null, 2)}
-` : formatRecurring(result));
+      writeOut(
+        flags.json
+          ? `${JSON.stringify(result, null, 2)}
+`
+          : formatRecurring(result),
+      );
     });
   try {
     program.parse(args, { from: "user" });
-    return 0;
+    return exitCode;
   } catch (error) {
     if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 1;
     writeErr(

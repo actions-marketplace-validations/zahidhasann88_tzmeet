@@ -1,5 +1,11 @@
 import { DateTime } from "luxon";
-import type { CronExplanation, CronRunNote } from "@tzmeet/core";
+import {
+  cronDialectName,
+  type CronDialectConversion,
+  type CronExplanation,
+  type CronRunNote,
+  type CronZoneConversion,
+} from "@tzmeet/core";
 
 export const defaultCronZones = [
   "Asia/Dhaka",
@@ -75,5 +81,56 @@ export function formatCron(result: CronExplanation): string {
       ),
       "",
     );
+  return lines.join("\n");
+}
+
+export function formatConversion(converted: {
+  dialect?: CronDialectConversion;
+  zone?: CronZoneConversion;
+}): string {
+  const lines: string[] = [];
+  const { dialect, zone } = converted;
+  if (dialect) {
+    const target = cronDialectName(dialect.to);
+    if (dialect.expressions.length)
+      lines.push(
+        `${target}:`,
+        ...dialect.expressions.map((expression) => `  ${expression}`),
+      );
+    else lines.push(`Can't convert to ${target} exactly:`);
+    lines.push(
+      ...dialect.problems.map((problem) => `  ! ${problem}`),
+      ...dialect.notes.map((note) => `  i ${note}`),
+      "",
+    );
+  }
+  if (zone) {
+    lines.push(
+      `${zone.expression} in ${zone.fromZone}, for a scheduler running in ${zone.toZone}:`,
+      zone.message,
+      "",
+    );
+    for (const period of zone.periods) {
+      const when = zone.constant
+        ? "All year"
+        : `${period.from} to ${period.to}`;
+      if (period.expressions.length)
+        lines.push(
+          `  ${when}:`,
+          ...period.expressions.map((expression) => `    ${expression}`),
+        );
+      else
+        lines.push(
+          `  ${when}: can't be shifted exactly`,
+          ...period.problems.map((problem) => `    ! ${problem}`),
+        );
+    }
+    lines.push(
+      "",
+      `Recommended (keeps working through DST): set the scheduler's time zone instead:`,
+      ...zone.native.split("\n").map((line) => `  ${line}`),
+      "",
+    );
+  }
   return lines.join("\n");
 }

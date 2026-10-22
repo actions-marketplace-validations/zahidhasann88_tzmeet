@@ -86,7 +86,7 @@ const repeated = (field: string) =>
                   ? ["Asia/Dhaka=09:00-15:30"]
                   : field === "optional"
                     ? ["America/New_York"]
-                  : ["Asia/Dhaka=fri,sat"],
+                    : ["Asia/Dhaka=fri,sat"],
       description: "Repeat parameter for each IANA_ZONE=value override",
       param: { style: "form", explode: true },
     });
@@ -113,7 +113,11 @@ export const resultQuerySchema = z
     rotation: z
       .enum(["2", "3"])
       .optional()
-      .openapi({ description: "Also suggest 2 or 3 times to alternate weekly (JSON only)", example: "2" }),
+      .openapi({
+        description:
+          "Also suggest 2 or 3 times to alternate weekly (JSON only)",
+        example: "2",
+      }),
   })
   .strict();
 export const slotsGetQuerySchema = resultQuerySchema.extend({
@@ -246,8 +250,20 @@ export const diagnosticsSchema = z.object({
 });
 export const rotationSchema = z.object({
   size: z.number().int(),
-  picks: z.array(z.object({ time: z.string(), slot: slotSchema, inconvenient: z.array(z.string()) })),
-  zones: z.array(z.object({ id: z.string(), label: z.string(), inconvenientTurns: z.number().int() })),
+  picks: z.array(
+    z.object({
+      time: z.string(),
+      slot: slotSchema,
+      inconvenient: z.array(z.string()),
+    }),
+  ),
+  zones: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      inconvenientTurns: z.number().int(),
+    }),
+  ),
   message: z.string(),
 });
 export const slotsResultSchema = z
@@ -295,20 +311,14 @@ export const cronQuerySchema = z
       .enum(cronDialects as ["unix", "kubernetes", "spring", "quartz"])
       .optional()
       .openapi({ example: "unix" }),
-    zone: z
-      .string()
-      .optional()
-      .openapi({
-        example: "America/New_York",
-        description: "Zone the schedule runs in (default: UTC)",
-      }),
-    from: z
-      .string()
-      .optional()
-      .openapi({
-        example: "2027-03-12T00:00:00Z",
-        description: "List runs after this ISO instant (default: now)",
-      }),
+    zone: z.string().optional().openapi({
+      example: "America/New_York",
+      description: "Zone the schedule runs in (default: UTC)",
+    }),
+    from: z.string().optional().openapi({
+      example: "2027-03-12T00:00:00Z",
+      description: "List runs after this ISO instant (default: now)",
+    }),
     count,
     display: z
       .string()
@@ -343,12 +353,7 @@ export const cronResultSchema = z
         local: z.string(),
         scheduled: z.string(),
         note: z
-          .enum([
-            "gap-catch-up",
-            "fold-once",
-            "fold-first",
-            "fold-second",
-          ])
+          .enum(["gap-catch-up", "fold-once", "fold-first", "fold-second"])
           .optional(),
         zones: z.array(cronZoneSchema),
       }),
@@ -387,12 +392,10 @@ export const recurringQuerySchema = slotsGetQuerySchema
       description:
         "First meeting date in the first zone; it repeats on this weekday",
     }),
-    time: z
-      .string()
-      .openapi({
-        example: "14:00",
-        description: "Meeting time (HH:mm) in the first zone",
-      }),
+    time: z.string().openapi({
+      example: "14:00",
+      description: "Meeting time (HH:mm) in the first zone",
+    }),
     weeks,
   });
 const recurringZoneSchema = z.object({
@@ -440,3 +443,82 @@ export const recurringResultSchema = z
     ),
   })
   .openapi("RecurringImpact");
+
+const dialectEnum = z.enum(
+  cronDialects as ["unix", "kubernetes", "spring", "quartz"],
+);
+export const cronConvertQuerySchema = z
+  .object({
+    expression: z
+      .string()
+      .min(1, "expression is required")
+      .max(200, "expression must be at most 200 characters")
+      .openapi({ example: "0 9 * * 1-5" }),
+    dialect: dialectEnum
+      .optional()
+      .openapi({
+        example: "unix",
+        description: "Source syntax (default: detected)",
+      }),
+    to: dialectEnum
+      .optional()
+      .openapi({ example: "quartz", description: "Convert to this syntax" }),
+    zone: z
+      .string()
+      .optional()
+      .openapi({
+        example: "Asia/Dhaka",
+        description: "Zone the schedule is meant for (default: UTC)",
+      }),
+    toZone: z
+      .string()
+      .optional()
+      .openapi({
+        example: "UTC",
+        description:
+          "Rewrite the schedule for a scheduler running in this zone",
+      }),
+    from: z
+      .string()
+      .optional()
+      .openapi({
+        example: "2026-10-23T00:00:00Z",
+        description: "Start of the year checked for DST changes (default: now)",
+      }),
+  })
+  .strict()
+  .refine((query) => query.to !== undefined || query.toZone !== undefined, {
+    message: "Give to and/or toZone",
+    path: ["to"],
+  });
+const dialectConversionSchema = z.object({
+  from: dialectEnum,
+  to: dialectEnum,
+  expressions: z.array(z.string()),
+  problems: z.array(z.string()),
+  notes: z.array(z.string()),
+});
+const zoneConversionSchema = z.object({
+  dialect: dialectEnum,
+  expression: z.string(),
+  fromZone: z.string(),
+  toZone: z.string(),
+  constant: z.boolean(),
+  periods: z.array(
+    z.object({
+      from: z.string(),
+      to: z.string(),
+      offsetMinutes: z.number().int(),
+      expressions: z.array(z.string()),
+      problems: z.array(z.string()),
+    }),
+  ),
+  native: z.string(),
+  message: z.string(),
+});
+export const cronConvertResultSchema = z
+  .object({
+    dialect: dialectConversionSchema.optional(),
+    zone: zoneConversionSchema.optional(),
+  })
+  .openapi("CronConversion");

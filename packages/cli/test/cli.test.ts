@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -1077,13 +1083,226 @@ describe("special hours and rotation", () => {
   });
 });
 
-describe('optional attendees', () => {
-  it('marks optional zones and never lets them block', () => {
-    const args = ['--zones', 'Europe/London,Asia/Dhaka,America/New_York', '--date', '2026-11-02', '--days', '1', '--step', '60', '--top', '20'];
-    const output = invoke([...args, '--optional', 'America/New_York']);
+describe("optional attendees", () => {
+  it("marks optional zones and never lets them block", () => {
+    const args = [
+      "--zones",
+      "Europe/London,Asia/Dhaka,America/New_York",
+      "--date",
+      "2026-11-02",
+      "--days",
+      "1",
+      "--step",
+      "60",
+      "--top",
+      "20",
+    ];
+    const output = invoke([...args, "--optional", "America/New_York"]);
     expect(output.code, output.stderr).toBe(0);
-    expect(output.stdout).toContain('* ideal / ~ acceptable / x unavailable (optional)');
+    expect(output.stdout).toContain(
+      "* ideal / ~ acceptable / x unavailable (optional)",
+    );
     expect(output.stdout).toMatch(/-0500 x \(optional\)/);
-    expect(json([...args, '--optional', 'America/New_York']).slots.length).toBeGreaterThan(json(args).slots.length);
+    expect(
+      json([...args, "--optional", "America/New_York"]).slots.length,
+    ).toBeGreaterThan(json(args).slots.length);
+  });
+});
+
+describe("cron conversion", () => {
+  it("converts syntax with --to and zones with --to-zone", () => {
+    const output = invoke([
+      "cron",
+      "0 9 * * 1-5",
+      "--zone",
+      "Asia/Dhaka",
+      "--to",
+      "quartz",
+      "--to-zone",
+      "UTC",
+    ]);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toContain("Quartz:\n  0 0 9 ? * MON-FRI");
+    expect(output.stdout).toContain(
+      "UTC is always 6 hours behind Asia/Dhaka, so one expression works all year.",
+    );
+    expect(output.stdout).toContain("  All year:\n    0 3 * * 1-5");
+    expect(output.stdout).toContain("  CRON_TZ=Asia/Dhaka\n  0 9 * * 1-5");
+  });
+
+  it("lists an expression per DST period and prints JSON", () => {
+    const output = invoke([
+      "cron",
+      "0 9 * * *",
+      "--dialect",
+      "kubernetes",
+      "--zone",
+      "America/New_York",
+      "--to-zone",
+      "UTC",
+      "--from",
+      "2026-10-23T00:00:00Z",
+      "--json",
+    ]);
+    expect(output.code, output.stderr).toBe(0);
+    const result = JSON.parse(output.stdout);
+    expect(
+      result.zone.periods.map(
+        (period: { expressions: string[] }) => period.expressions[0],
+      ),
+    ).toEqual(["0 13 * * *", "0 14 * * *", "0 13 * * *"]);
+  });
+
+  it("exits 1 when a conversion is impossible, or the target is unknown", () => {
+    const impossible = invoke(["cron", "0 0 0 13 * FRI", "--to", "unix"]);
+    expect(impossible.code).toBe(1);
+    expect(impossible.stdout).toContain("Can't convert to Unix cron exactly:");
+    const unknown = invoke(["cron", "0 9 * * *", "--to", "cronie"]);
+    expect(unknown.code).toBe(1);
+    expect(unknown.stderr).toContain(
+      "--to must be unix, kubernetes, spring or quartz",
+    );
+  });
+});
+
+describe("cron --check", () => {
+  const from = ["--from", "2026-10-23T00:00:00Z"];
+  const crontab = [
+    "MAILTO=ops@example.com",
+    "0 9 * * 1-5 /usr/bin/report",
+    "CRON_TZ=America/New_York",
+    "30 2 * * * /usr/bin/backup",
+    "15 1 * * 0 /usr/bin/rotate",
+    "@reboot /usr/bin/warm",
+    "",
+  ].join("\n");
+  const jobs = [
+    "apiVersion: batch/v1",
+    "kind: CronJob",
+    "metadata:",
+    "  name: cleanup",
+    "spec:",
+    '  schedule: "30 1 * * *"',
+    '  timeZone: "Europe/London"',
+    "  jobTemplate: {}",
+    "---",
+    "apiVersion: batch/v1",
+    "kind: CronJob",
+    "metadata:",
+    "  name: report",
+    "spec:",
+    '  schedule: "0 6 13 * 5"',
+    "  jobTemplate: {}",
+    "---",
+    "apiVersion: v1",
+    "kind: ConfigMap",
+    "metadata:",
+    "  name: other",
+    "",
+  ].join("\n");
+  const setup = () => {
+    writeFileSync(join(cwd, "crontab"), crontab);
+    mkdirSync(join(cwd, "k8s"));
+    writeFileSync(join(cwd, "k8s", "jobs.yaml"), jobs);
+    mkdirSync(join(cwd, "node_modules"));
+    writeFileSync(
+      join(cwd, "node_modules", "ignored.yaml"),
+      'kind: CronJob\nspec:\n  schedule: "nope"\n',
+    );
+  };
+
+  it("finds DST problems in crontabs and CronJobs, with file and line, and exits 1", () => {
+    setup();
+    const output = invoke(["cron", "--check", ".", ...from]);
+    expect(output.code).toBe(1);
+    expect(output.stdout).toMatchSnapshot();
+    expect(output.stdout).toContain(
+      "crontab:4: error: On 2027-03-14 in America/New_York, clocks jump from 02:00 to 03:00.",
+    );
+    expect(output.stdout).toContain(
+      "k8s/jobs.yaml:6: error: cleanup: On 2026-10-25 in Europe/London, clocks go back from 02:00 to 01:00, so the 01:30 run happens twice.",
+    );
+    expect(output.stdout).toContain(
+      "k8s/jobs.yaml:15: warning: report: no spec.timeZone",
+    );
+    expect(output.stdout).toContain(
+      "Checked 5 schedules in 2 files: 3 errors, 2 warnings.",
+    );
+  });
+
+  it("passes clean files, and fails on warnings only with --strict", () => {
+    writeFileSync(join(cwd, "ok.crontab"), "0 9 * * * /bin/true\n");
+    writeFileSync(
+      join(cwd, "job.yml"),
+      'kind: CronJob\nmetadata:\n  name: plain\nspec:\n  schedule: "0 9 * * *"\n',
+    );
+    expect(invoke(["cron", "--check", "ok.crontab", ...from])).toMatchObject({
+      code: 0,
+    });
+    expect(invoke(["cron", "--check", "job.yml", ...from])).toMatchObject({
+      code: 0,
+    });
+    expect(
+      invoke(["cron", "--check", "job.yml", "--strict", ...from]),
+    ).toMatchObject({ code: 1 });
+  });
+
+  it("uses --zone where no time zone is set", () => {
+    writeFileSync(join(cwd, "ok.crontab"), "30 1 * * * /bin/true\n");
+    expect(invoke(["cron", "--check", "ok.crontab", ...from]).code).toBe(0);
+    const output = invoke([
+      "cron",
+      "--check",
+      "ok.crontab",
+      "--zone",
+      "Europe/London",
+      ...from,
+    ]);
+    expect(output.code).toBe(1);
+    expect(output.stdout).toContain("[30 1 * * * in Europe/London]");
+  });
+
+  it("prints GitHub annotations and JSON", () => {
+    setup();
+    const github = invoke([
+      "cron",
+      "--check",
+      "k8s",
+      "--format",
+      "github",
+      ...from,
+    ]);
+    expect(github.stdout.split("\n")[0]).toBe(
+      "::error file=k8s/jobs.yaml,line=6,title=tzmeet cron check::cleanup: On 2026-10-25 in Europe/London, clocks go back from 02:00 to 01:00, so the 01:30 run happens twice. [30 1 * * * in Europe/London]",
+    );
+    const result = JSON.parse(
+      invoke(["cron", "--check", "k8s", "--json", ...from]).stdout,
+    );
+    expect(result).toMatchObject({ files: 1, schedules: 2 });
+    expect(
+      result.findings.map((finding: { code: string }) => finding.code),
+    ).toEqual(["dst-double", "dst-skip", "k8s-no-timezone", "dom-dow-or"]);
+  });
+
+  it("reports bad lines, bad zones and missing paths", () => {
+    writeFileSync(
+      join(cwd, "bad.crontab"),
+      "CRON_TZ=Mars/Base\n61 * * * * /bin/x\n0 9 * *\n",
+    );
+    const output = invoke(["cron", "--check", "bad.crontab", ...from]);
+    expect(output.code).toBe(1);
+    expect(output.stdout).toContain(
+      "bad.crontab:1: error: CRON_TZ is not a valid IANA time zone: Mars/Base",
+    );
+    expect(output.stdout).toContain(
+      "bad.crontab:2: error: Invalid schedule: minute must be 0–59, got 61",
+    );
+    expect(output.stdout).toContain("bad.crontab:3: error: Not a cron line");
+    const missing = invoke(["cron", "--check", "nowhere"]);
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain("Cannot read nowhere");
+    expect(
+      invoke(["cron", "--check", ".", "--format", "xml"]).stderr,
+    ).toContain("--format must be text or github");
   });
 });

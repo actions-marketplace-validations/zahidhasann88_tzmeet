@@ -88,7 +88,7 @@ describe("shared formats and generated documentation", () => {
       resolve: { http: false, file: false },
     })) as unknown as Document;
     expect(validated.openapi).toBe("3.0.3");
-    expect(Object.keys(validated.paths)).toHaveLength(8);
+    expect(Object.keys(validated.paths)).toHaveLength(9);
     const slots = validated.paths["/v1/slots"]!.post!;
     const ok = slots.responses["200"];
     expect(ok && "content" in ok ? Object.keys(ok.content ?? {}) : []).toEqual([

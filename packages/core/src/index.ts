@@ -74,6 +74,8 @@ export type {
   ParsedCron,
 } from "./cron/parse.js";
 export { describeCron } from "./cron/describe.js";
+export { convertCronDialect, convertCronZone } from "./cron/convert.js";
+export type { CronDialectConversion, CronZoneConversion, CronZonePeriod } from "./cron/convert.js";
 export { recurringImpact, recurringSchema } from "./recurring.js";
 export {
   holidayListYears,

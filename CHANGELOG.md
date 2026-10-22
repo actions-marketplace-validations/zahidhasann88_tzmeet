@@ -11,6 +11,9 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 - Imported calendars can be remembered on this device (browser storage only, never in share links).
 - Link previews: Open Graph tags and preview images for the site, and a `/cron/` page with its own preview. The cron explainer's "Copy link" now uses it.
 
+- Cron converters: `convertCronDialect` converts between Unix, Kubernetes, Spring and Quartz syntax (seconds and year fields, Quartz `?`, day-of-week numbering, day-of-month/day-of-week meaning), and `convertCronZone` rewrites a schedule for a scheduler in another time zone, with one expression per DST period and the native time-zone setting. Available as `tzmeet cron --to/--to-zone`, `GET /v1/cron/convert` and a Convert panel on the web cron page.
+- Cron check for CI: `tzmeet cron --check <files/folders>` scans crontabs and Kubernetes CronJob YAML, fails on runs that DST skips, delays or doubles, warns about missing `spec.timeZone` and day-of-month/day-of-week OR, and prints GitHub annotations with `--format github`. Also a GitHub Action (`action.yml`).
+
 ### Changed
 
 - Spring cron schedules now report that a time in the repeated DST hour runs twice, confirmed by running Spring 6.2.19 and 7.0.10. The `fold-maybe-twice` run note and `dst-maybe-double` warning code are removed.

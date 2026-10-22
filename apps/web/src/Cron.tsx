@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import {
+  convertCronDialect,
+  convertCronZone,
   cronDialectName,
   cronDialects,
   detectDialect,
@@ -422,6 +424,14 @@ export default function CronPage({
                   </ul>
                 </div>
               )}
+              <ConvertPanel
+                expression={state.expression}
+                dialect={result.dialect}
+                zone={result.zone}
+                from={from}
+                zones={zones}
+                copy={copy}
+              />
               <p className="result-disclaimer">
                 DST behaviour follows each engine's source and docs: cronie,
                 robfig/cron, Spring and Quartz. Uses your browser's time zone
@@ -540,5 +550,91 @@ function ZoneInput({
         ))}
       </datalist>
     </label>
+  );
+}
+
+/** Convert the expression to another syntax, or for a server in another time zone. */
+function ConvertPanel({
+  expression,
+  dialect,
+  zone,
+  from,
+  zones,
+  copy,
+}: {
+  expression: string;
+  dialect: CronDialect;
+  zone: string;
+  from: string;
+  zones: string[];
+  copy: (text: string, message: string) => Promise<void>;
+}) {
+  const [target, setTarget] = useState<CronDialect | "">("");
+  const [serverZone, setServerZone] = useState("");
+  const converted = useMemo(() => {
+    try {
+      return {
+        dialect: target ? convertCronDialect(expression, { from: dialect, to: target }) : null,
+        zone: serverZone && serverZone !== zone ? convertCronZone({ expression, dialect, fromZone: zone, toZone: serverZone, from }) : null,
+      };
+    } catch {
+      return { dialect: null, zone: null };
+    }
+  }, [expression, dialect, zone, from, target, serverZone]);
+  const copyable = (text: string) => (
+    <div key={text} className="convert-expression">
+      <code>{text}</code>
+      <button type="button" className="text-button" aria-label={`Copy ${text}`} onClick={() => void copy(text, "Expression copied.")}>
+        Copy
+      </button>
+    </div>
+  );
+  return (
+    <section className="convert-panel" aria-labelledby="convert-heading">
+      <h3 id="convert-heading">Convert</h3>
+      <div className="field-pair">
+        <label>
+          To syntax
+          <select aria-label="Convert to syntax" value={target} onChange={(event) => setTarget(event.target.value as CronDialect | "")}>
+            <option value="">Choose…</option>
+            {cronDialects.filter((name) => name !== dialect).map((name) => (
+              <option key={name} value={name}>
+                {cronDialectName(name)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <ZoneInput label="Server time zone" zones={zones} value={serverZone} onPick={setServerZone} />
+      </div>
+      {converted.dialect && (
+        <div className="convert-result">
+          <strong>{cronDialectName(converted.dialect.to)}</strong>
+          {converted.dialect.expressions.map(copyable)}
+          {converted.dialect.problems.map((problem) => (
+            <p key={problem} className="convert-problem">{problem}</p>
+          ))}
+          {converted.dialect.notes.map((note) => (
+            <p key={note} className="detail-hint">{note}</p>
+          ))}
+        </div>
+      )}
+      {converted.zone && (
+        <div className="convert-result">
+          <strong>For a server in {converted.zone.toZone}</strong>
+          <p className="detail-hint">{converted.zone.message}</p>
+          {converted.zone.periods.map((period) => (
+            <div key={period.from} className="convert-period">
+              <span>{converted.zone!.constant ? "All year" : `${period.from} to ${period.to}`}</span>
+              {period.expressions.map(copyable)}
+              {period.problems.map((problem) => (
+                <p key={problem} className="convert-problem">{problem}</p>
+              ))}
+            </div>
+          ))}
+          <p className="detail-hint">Recommended: keep the schedule and set the scheduler's time zone, which stays right through daylight saving.</p>
+          <pre className="convert-native">{converted.zone.native}</pre>
+        </div>
+      )}
+    </section>
   );
 }

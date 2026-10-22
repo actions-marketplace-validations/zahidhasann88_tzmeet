@@ -63,6 +63,18 @@ console.log(result.slots[0]);
 
 See the [library guide](packages/core/README.md).
 
+### 5. Cron schedules
+
+tzmeet also explains cron schedules (Unix, Kubernetes, Spring, Quartz), converts them between syntaxes and time zones, and checks them for daylight saving problems: in the [web app](https://zahidhasann88.github.io/tzmeet/cron/), with `npx tzmeet cron`, or in CI with the GitHub Action:
+
+```yaml
+- uses: zahidhasann88/tzmeet@v0.4.0
+  with:
+    paths: k8s/
+```
+
+See the [CLI guide](packages/cli/README.md#cron-schedules).
+
 ## Defaults
 
 - Work hours: 09:00–18:00
