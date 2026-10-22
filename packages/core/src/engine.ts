@@ -33,7 +33,6 @@ const isoDays = [
 ];
 const toMinutes = (time: string) =>
   Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
-/** Inclusive clock window; a start later than the end runs past midnight (e.g. 22:00–06:00). */
 const inWindow = (minute: number, start: number, end: number) =>
   start <= end
     ? minute >= start && minute <= end
@@ -54,21 +53,53 @@ function parseInput(input: FindSlotsInput): NormalizedInput {
   return parsed.data;
 }
 
+function hoursOn(zone: NormalZone, date: string) {
+  const period = zone.specialHours?.find(
+    (entry) => entry.from <= date && date <= entry.to,
+  );
+  return period
+    ? {
+        workStart: period.workStart,
+        workEnd: period.workEnd,
+        quietBefore: period.quietBefore ?? zone.quietBefore,
+        quietAfter: period.quietAfter ?? zone.quietAfter,
+      }
+    : zone;
+}
+
 function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput["prayer"]) {
   const dailyBoundaries = new Map<string, number[]>();
   const prayerDates = new Map<string, ReturnType<typeof getPrayerWindows>>();
   const rule = zone.prayer ?? globalPrayer;
-  // Calendar busy times, sorted by start. Touching a busy interval is allowed.
   const busy = (zone.busy ?? [])
     .map(
       (interval) =>
         [Date.parse(interval.start), Date.parse(interval.end)] as const,
     )
     .sort((x, y) => x[0] - y[0]);
-  const workStart = toMinutes(zone.workStart);
-  const workEnd = toMinutes(zone.workEnd);
-  const quietBefore = toMinutes(zone.quietBefore);
-  const quietAfter = toMinutes(zone.quietAfter);
+  const minutesOn = new Map<
+    string,
+    {
+      workStart: number;
+      workEnd: number;
+      quietBefore: number;
+      quietAfter: number;
+    }
+  >();
+  const windowsOn = (date: string) => {
+    let cached = minutesOn.get(date);
+    if (!cached) {
+      const hours = hoursOn(zone, date);
+      cached = {
+        workStart: toMinutes(hours.workStart),
+        workEnd: toMinutes(hours.workEnd),
+        quietBefore: toMinutes(hours.quietBefore),
+        quietAfter: toMinutes(hours.quietAfter),
+      };
+      minutesOn.set(date, cached);
+    }
+    return cached;
+  };
   const holidays = new Set(zone.holidays ?? []);
   const presetYears = new Map<number, Set<string>>();
   const isHoliday = (date: string) => {
@@ -92,11 +123,12 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput["prayer"]) {
     const start = day.startOf("day");
     const end = start.plus({ days: 1 }).startOf("day");
     const points = [start.toMillis(), end.toMillis()];
+    const hours = hoursOn(zone, key);
     for (const clock of [
-      zone.workStart,
-      zone.workEnd,
-      zone.quietBefore,
-      zone.quietAfter,
+      hours.workStart,
+      hours.workEnd,
+      hours.quietBefore,
+      hours.quietAfter,
     ]) {
       const wall = DateTime.fromObject(
         {
@@ -196,8 +228,10 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput["prayer"]) {
         isHoliday(local.toISODate()!)
       )
         constraints.add("holiday");
-      if (!inWindow(minute, quietBefore, quietAfter)) constraints.add("quiet");
-      if (!inWindow(minute, workStart, workEnd)) ideal = false;
+      const windows = windowsOn(local.toISODate()!);
+      if (!inWindow(minute, windows.quietBefore, windows.quietAfter))
+        constraints.add("quiet");
+      if (!inWindow(minute, windows.workStart, windows.workEnd)) ideal = false;
     }
     return {
       classification: constraints.size
@@ -255,9 +289,12 @@ function humanReason(zones: ZoneSlot[], input: NormalizedInput): string {
   const acceptable = zones
     .filter((zone) => zone.classification === "acceptable")
     .map((zone) => {
-      const rule = input.zones.find((rule) => rule.id === zone.id)!;
       const start = DateTime.fromISO(zone.localStart, { setZone: true });
       const end = DateTime.fromISO(zone.localEnd, { setZone: true });
+      const rule = hoursOn(
+        input.zones.find((rule) => rule.id === zone.id)!,
+        start.toISODate()!,
+      );
       const from = toMinutes(rule.quietBefore);
       const offset = (time: DateTime) =>
         minutesAhead(from, time.hour * 60 + time.minute);

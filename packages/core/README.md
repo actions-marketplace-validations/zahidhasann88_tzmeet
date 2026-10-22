@@ -37,6 +37,7 @@ if (result.slots.length === 0) {
 - `explainCron({ expression, from, zone?, dialect?, count?, displayZones? })` – explains a Unix, Kubernetes, Spring or Quartz cron expression in plain English, lists its next runs in any zones, and warns about runs that daylight saving skips or repeats. Each engine's own DST behaviour is applied.
 - `parseCron(expression, dialect?)` – checks a cron expression and returns field-by-field errors.
 - `recurringImpact({ zones, startDate, time, weeks?, durationMinutes? })` – follows a weekly meeting (fixed at `time` in the first zone) through the coming weeks and shows where each zone's local time moves because of daylight saving, and why.
+- `fairRotation(result, { size: 2 | 3 })` – picks times from a search to alternate week by week, so the inconvenient slot is shared instead of always falling on the same city.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 
@@ -50,6 +51,7 @@ if (result.slots.length === 0) {
 | `holidays` | `[]` (dates as YYYY-MM-DD) |
 | `holidayPreset` | off (`BD`, `GB-ENG` or `US`; see `presetHolidays(preset, year)`) |
 | `busy` | `[]` (`{ start, end }` ISO instants; read them from an `.ics` file with `parseIcsBusy(text, { from, to, defaultZone })`) |
+| `specialHours` | `[]` (`{ label?, from, to, workStart, workEnd, quietBefore?, quietAfter? }`; `ramadanDates(year, preset?)` gives approximate Ramadan dates) |
 | `prayer` | off |
 
 ## How scoring works

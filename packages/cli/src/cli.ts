@@ -5,10 +5,11 @@ import {
   listTimeZones,
   parseIntegerOption,
   recurringImpact,
+  fairRotation,
   type CronDialect,
 } from "@tzmeet/core";
 import { readConfig, resolveOptions, type CliFlags } from "./config.js";
-import { formatTable, selectTop } from "./output.js";
+import { formatRotation, formatTable, selectTop } from "./output.js";
 import { defaultCronZones, formatCron } from "./cron.js";
 import { formatRecurring } from "./recurring.js";
 import { applyBusy } from "./busy.js";
@@ -91,6 +92,20 @@ export function runCLI(
       collect,
     )
     .option(
+      "--special-hours <IANA_ZONE=FROM..TO@HH:mm-HH:mm>",
+      "different work hours for a date range, e.g. Europe/London=2026-12-21..2026-12-31@10:00-16:00; repeatable",
+      collect,
+    )
+    .option(
+      "--ramadan <IANA_ZONE=HH:mm-HH:mm>",
+      "work hours during Ramadan (dates calculated, approximate), e.g. Asia/Dhaka=09:00-15:30; repeatable",
+      collect,
+    )
+    .option(
+      "--rotation <2|3>",
+      "also suggest 2 or 3 times to alternate weekly so no city always gets the inconvenient slot",
+    )
+    .option(
       "--quiet <HH:mm-HH:mm>",
       "override allowed hours in every zone (default: 08:00-21:00)",
     )
@@ -126,6 +141,7 @@ Examples:
   tzmeet zones london
   tzmeet cron "30 2 * * *" --zone America/New_York
   tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
+  tzmeet --zones Asia/Dhaka,Europe/London --ramadan Asia/Dhaka=09:00-15:30 --rotation 2
 
 Precedence: config/defaults < global flags < per-zone flags.
 Default weekend is Sat/Sun, or Fri/Sat for Dhaka and other Fri/Sat countries.
@@ -142,11 +158,17 @@ No slots found is a successful search (exit 0); invalid input exits 1.
         context.now?.() ?? new Date(),
       );
       const busy = applyBusy(input, flags.busy, context.cwd ?? process.cwd(), input.days, writeErr);
-      const result = selectTop(findSlots(busy), top);
+      const found = findSlots(busy);
+      const result = selectTop(found, top);
+      if (flags.rotation !== undefined && flags.rotation !== "2" && flags.rotation !== "3")
+        throw new Error(`--rotation must be 2 or 3, received ${JSON.stringify(flags.rotation)}`);
+      const rotation = flags.rotation
+        ? fairRotation(found, { size: Number(flags.rotation) as 2 | 3 })
+        : undefined;
       writeOut(
         flags.json
-          ? `${JSON.stringify(result, null, 2)}\n`
-          : formatTable(result, input),
+          ? `${JSON.stringify(rotation === undefined ? result : { ...result, rotation }, null, 2)}\n`
+          : formatTable(result, input) + (rotation ? formatRotation(rotation) : ""),
       );
     });
   program

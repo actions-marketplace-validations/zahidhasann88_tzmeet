@@ -4,7 +4,12 @@ import {
   type NormalizedInput,
   type ZoneRule,
 } from "./schema.js";
-import { holidayPresetIds, type HolidayPreset } from "./holidays.js";
+import {
+  holidayPresetIds,
+  ramadanDates,
+  suggestHolidayPreset,
+  type HolidayPreset,
+} from "./holidays.js";
 
 export interface ScheduleTextOptions {
   zones?: string;
@@ -17,6 +22,10 @@ export interface ScheduleTextOptions {
   weekend?: readonly string[];
   holiday?: readonly string[];
   holidayPreset?: readonly string[];
+  /** Repeatable `IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` work hours for a date range. */
+  specialHours?: readonly string[];
+  /** Repeatable `IANA_ZONE=HH:mm-HH:mm` work hours during Ramadan (dates are calculated). */
+  ramadan?: readonly string[];
   quiet?: string;
   prayerBuffer?: string;
   prayerLocation?: string;
@@ -204,6 +213,45 @@ export function parseScheduleInput(
         value,
       );
     zone.holidayPreset = preset as HolidayPreset;
+  }
+  for (const override of options.specialHours ?? []) {
+    const { zone, value } = assignment(override, "special-hours", zones);
+    const match = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})@(.+)$/.exec(
+      value,
+    );
+    if (!match)
+      return fail(
+        "specialHours",
+        "--special-hours must use IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm",
+        value,
+      );
+    const [workStart, workEnd] = window(match[3]!, "special-hours");
+    zone.specialHours = [
+      ...(zone.specialHours ?? []),
+      { from: match[1]!, to: match[2]!, workStart, workEnd },
+    ];
+  }
+  for (const override of options.ramadan ?? []) {
+    const { zone, value } = assignment(override, "ramadan", zones);
+    const [workStart, workEnd] = window(value, "ramadan");
+    const year = Number((options.date ?? defaults.startDate ?? "").slice(0, 4));
+    if (!year) return fail("ramadan", "--ramadan needs a start date", value);
+    const preset = zone.holidayPreset ?? suggestHolidayPreset(zone.id);
+    for (const dates of [
+      ramadanDates(year, preset),
+      ramadanDates(year + 1, preset),
+    ]) {
+      if (!dates)
+        return fail(
+          "ramadan",
+          "This runtime can't calculate Ramadan dates; use --special-hours instead",
+          value,
+        );
+      zone.specialHours = [
+        ...(zone.specialHours ?? []),
+        { label: "Ramadan", ...dates, workStart, workEnd },
+      ];
+    }
   }
   let prayer: unknown = defaults.prayer;
   if (

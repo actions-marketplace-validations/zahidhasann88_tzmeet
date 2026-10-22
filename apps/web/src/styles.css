@@ -2297,3 +2297,94 @@ input[aria-invalid="true"] {
   text-decoration: underline;
   padding: 2px 0;
 }
+
+.ramadan-field {
+  display: grid;
+  gap: 8px;
+}
+.ramadan-field legend {
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink);
+  cursor: pointer;
+}
+.inline-check input {
+  margin: 0;
+}
+.rotation-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 16px 19px;
+  margin-bottom: 14px;
+  display: grid;
+  gap: 12px;
+}
+.rotation-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rotation-heading h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.rotation-size {
+  min-width: 170px;
+}
+.rotation-message {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.rotation-picks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.rotation-picks li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+}
+.rotation-week {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  min-width: 52px;
+}
+.rotation-time {
+  display: grid;
+  gap: 2px;
+  min-width: 90px;
+}
+.rotation-time small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.rotation-time strong {
+  font-size: 17px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.rotation-time .badge {
+  justify-self: start;
+}

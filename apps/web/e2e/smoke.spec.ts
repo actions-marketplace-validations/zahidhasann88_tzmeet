@@ -441,13 +441,11 @@ test("imports a busy calendar in the browser without sharing it", async ({
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
-  await page
-    .getByLabel("London busy calendar")
-    .setInputFiles({
-      name: "london.ics",
-      mimeType: "text/calendar",
-      buffer: Buffer.from(ics),
-    });
+  await page.getByLabel("London busy calendar").setInputFiles({
+    name: "london.ics",
+    mimeType: "text/calendar",
+    buffer: Buffer.from(ics),
+  });
   await expect(page.locator(".calendar-status")).toContainText(
     "london.ics: 1 busy time in range, from 1 event.",
   );
@@ -475,4 +473,74 @@ test("imports a busy calendar in the browser without sharing it", async ({
     .getByRole("button", { name: "Remove London busy calendar" })
     .click();
   await expect(first).toContainText("Monday, 2 Nov");
+});
+
+test("suggests a fair rotation and stores Ramadan hours with the workspace", async ({
+  page,
+}) => {
+  await mockClipboard(page);
+  await open(page);
+  await expect(
+    page.getByRole("heading", { name: "Share the inconvenient times" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Add a time zone", exact: false })
+    .click();
+  await page.getByLabel("Search time zones").fill("Tokyo");
+  await page
+    .getByRole("button", { name: "Add Tokyo (Asia/Tokyo)", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Remove Dhaka", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Remove New York", exact: true })
+    .click();
+  const card = page.getByRole("region", {
+    name: "Share the inconvenient times",
+  });
+  await expect(card).toContainText(
+    "Inconvenient weeks: London 1 of 2, Tokyo 1 of 2",
+  );
+  await card.getByRole("button", { name: "3 times" }).click();
+  await expect(card.locator(".rotation-picks li")).toHaveCount(3);
+  const audit = await new AxeBuilder({ page })
+    .include(".rotation-card")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+
+  await page
+    .getByRole("button", { name: "Settings for Tokyo", exact: true })
+    .click();
+  await page.getByLabel("Tokyo Ramadan hours").check();
+  await expect(page.locator(".ramadan-field")).toContainText(
+    "18 Feb 2026 – 19 Mar 2026 · 8 Feb 2027 – 8 Mar 2027",
+  );
+  await page.getByLabel("Tokyo Ramadan work ends").fill("15:00");
+  await page.getByRole("button", { name: "Share workspace" }).click();
+  const share = await page.evaluate(
+    () => document.documentElement.dataset.clipboard!,
+  );
+  const tokyo = JSON.parse(
+    new URL(share).searchParams.get("state")!,
+  ).input.zones.find((zone: { id: string }) => zone.id === "Asia/Tokyo");
+  expect(tokyo.specialHours).toEqual([
+    {
+      label: "Ramadan",
+      from: "2026-02-18",
+      to: "2026-03-19",
+      workStart: "09:00",
+      workEnd: "15:00",
+    },
+    {
+      label: "Ramadan",
+      from: "2027-02-08",
+      to: "2027-03-08",
+      workStart: "09:00",
+      workEnd: "15:00",
+    },
+  ]);
+  await page.getByLabel("Tokyo Ramadan hours").uncheck();
+  await expect(page.locator('.ramadan-field input[type="time"]')).toHaveCount(
+    0,
+  );
 });

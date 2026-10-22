@@ -19,9 +19,11 @@ import {
   holidayPresetIds,
   holidayPresets,
   presetHolidays,
+  ramadanDates,
   suggestHolidayPreset,
   type HolidayPreset,
 } from "@tzmeet/core";
+import RotationCard from "./Rotation";
 import Icon from "./Icon";
 import {
   decodeState,
@@ -576,6 +578,11 @@ function ZoneSettings({
                       change(index, { holidayPreset })
                     }
                   />
+                  <RamadanField
+                    zone={zone}
+                    from={state.input.startDate}
+                    onChange={(specialHours) => change(index, { specialHours })}
+                  />
                   <CalendarField
                     zone={zone}
                     calendar={calendars[zone.id]}
@@ -737,6 +744,63 @@ function HolidayPresetField({
         </span>
       )}
     </label>
+  );
+}
+
+/** Shorter work hours during Ramadan, stored as special hours for this year and next. */
+function RamadanField({
+  zone,
+  from,
+  onChange,
+}: {
+  zone: NormalizedInput["zones"][number];
+  from: string;
+  onChange: (specialHours: NormalizedInput["zones"][number]["specialHours"]) => void;
+}) {
+  const ramadan = (zone.specialHours ?? []).filter((period) => period.label === "Ramadan");
+  const others = (zone.specialHours ?? []).filter((period) => period.label !== "Ramadan");
+  const label = zone.label ?? zone.id;
+  const enable = (workStart: string, workEnd: string) => {
+    const year = Number(from.slice(0, 4)) || new Date().getFullYear();
+    const preset = zone.holidayPreset ?? suggestHolidayPreset(zone.id);
+    const periods = [ramadanDates(year, preset), ramadanDates(year + 1, preset)]
+      .filter((dates): dates is { from: string; to: string } => dates !== null)
+      .map((dates) => ({ label: "Ramadan", ...dates, workStart, workEnd }));
+    onChange([...others, ...periods]);
+  };
+  const setHours = (workStart: string, workEnd: string) =>
+    onChange([...others, ...ramadan.map((period) => ({ ...period, workStart, workEnd }))]);
+  const format = (date: string) => DateTime.fromISO(date).setLocale("en").toFormat("d LLL yyyy");
+  return (
+    <fieldset className="ramadan-field">
+      <legend>Ramadan hours</legend>
+      <label className="inline-check">
+        <input
+          type="checkbox"
+          aria-label={`${label} Ramadan hours`}
+          checked={ramadan.length > 0}
+          onChange={(event) => (event.target.checked ? enable("09:00", "15:30") : onChange(others.length ? others : undefined))}
+        />
+        <span>Use shorter work hours during Ramadan</span>
+      </label>
+      {ramadan.length > 0 && (
+        <>
+          <div className="field-pair">
+            <label>
+              Starts
+              <input type="time" aria-label={`${label} Ramadan work starts`} value={ramadan[0]!.workStart} onChange={(event) => setHours(event.target.value, ramadan[0]!.workEnd)} />
+            </label>
+            <label>
+              Ends
+              <input type="time" aria-label={`${label} Ramadan work ends`} value={ramadan[0]!.workEnd} onChange={(event) => setHours(ramadan[0]!.workStart, event.target.value)} />
+            </label>
+          </div>
+          <span className="detail-hint">
+            {ramadan.map((period) => `${format(period.from)} – ${format(period.to)}`).join(" · ")} (approximate, from the Umm al-Qura calendar).
+          </span>
+        </>
+      )}
+    </fieldset>
   );
 }
 
@@ -1438,6 +1502,7 @@ function WorkspaceResults({
           Ranked by shared work hours, then a gentle preference for earlier,
           mid-day meetings.
         </p>
+        {result && <RotationCard result={result} />}
         {search.error && (
           <div className="error-box" role="alert">
             <strong>Check your settings</strong>

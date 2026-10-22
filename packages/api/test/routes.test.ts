@@ -830,3 +830,77 @@ describe("busy times over HTTP", () => {
     });
   });
 });
+
+describe("special hours and rotation over HTTP", () => {
+  const pair =
+    "zones=UTC,Asia/Tokyo&date=2026-11-02&days=1&step=60&weekend=UTC=none&weekend=Asia/Tokyo=none&work=09:00-17:00&quiet=07:00-21:00";
+
+  it("adds a rotation to JSON only when asked, using every slot found", async () => {
+    const plain = slotsResultSchema.parse(
+      await (await app.request(`/v1/slots?${pair}&top=1`)).json(),
+    );
+    expect(plain).not.toHaveProperty("rotation");
+    const body = slotsResultSchema.parse(
+      await (await app.request(`/v1/slots?${pair}&top=1&rotation=2`)).json(),
+    );
+    expect(body.slots).toHaveLength(1);
+    expect(body.rotation).toMatchObject({
+      size: 2,
+      zones: [
+        { id: "UTC", inconvenientTurns: 1 },
+        { id: "Asia/Tokyo", inconvenientTurns: 1 },
+      ],
+    });
+    const posted = slotsResultSchema.parse(
+      await (
+        await post(
+          {
+            zones: [{ id: "Europe/London" }, { id: "Europe/Paris" }],
+            startDate: "2026-11-02",
+            days: 1,
+          },
+          "?rotation=3",
+        )
+      ).json(),
+    );
+    expect(posted.rotation).toMatchObject({ size: 1 });
+  });
+
+  it("applies ramadan and specialHours query parameters", async () => {
+    const classification = async (extra: string) => {
+      const body = slotsResultSchema.parse(
+        await (
+          await app.request(
+            `/v1/slots?zones=Asia/Dhaka,Europe/London&date=2027-02-10&days=1&step=60&top=50${extra}`,
+          )
+        ).json(),
+      );
+      return body.slots.find((slot) => slot.start.includes("T10:00"))!.zones[0]!
+        .classification;
+    };
+    expect(await classification("")).toBe("ideal");
+    expect(await classification("&ramadan=Asia/Dhaka=09:00-15:30")).toBe(
+      "acceptable",
+    );
+    expect(
+      await classification(
+        "&specialHours=Asia/Dhaka=2027-02-01..2027-02-28@09:00-14:00",
+      ),
+    ).toBe("acceptable");
+  });
+
+  it.each([
+    ["/v1/slots?zones=UTC&date=2026-11-02&rotation=4", "rotation"],
+    [
+      "/v1/slots?zones=UTC&date=2026-11-02&specialHours=UTC=bad",
+      "specialHours",
+    ],
+    [
+      "/v1/recurring?zones=UTC&date=2026-11-02&time=09:00&rotation=2",
+      "rotation",
+    ],
+  ])("rejects %s", async (url, field) => {
+    const error = await publicError(await app.request(url));
+    expect(error.details).toContainEqual(expect.objectContaining({ field }));
+  });
+});

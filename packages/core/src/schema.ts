@@ -12,7 +12,6 @@ export const cities = {
   Singapore: { lat: 1.3521, lng: 103.8198 },
 } as const;
 
-/** Supported adhan calculation methods; MWL is MuslimWorldLeague. */
 export const prayerMethods = [
   "Karachi",
   "UmmAlQura",
@@ -101,6 +100,58 @@ export const busyIntervalSchema = z
     path: ["end"],
   });
 
+/** Different hours for a date range, e.g. shorter Ramadan office hours. */
+export const specialHoursSchema = z
+  .object({
+    label: z.string().trim().min(1).max(40).optional(),
+    from: dateSchema,
+    to: dateSchema,
+    workStart: timeSchema,
+    workEnd: timeSchema,
+    quietBefore: timeSchema.optional(),
+    quietAfter: timeSchema.optional(),
+  })
+  .strict();
+
+function checkWindows(
+  hours: {
+    workStart: string;
+    workEnd: string;
+    quietBefore: string;
+    quietAfter: string;
+  },
+  ctx: z.RefinementCtx,
+  path: (string | number)[],
+) {
+  if (hours.workStart === hours.workEnd) {
+    ctx.addIssue({
+      code: "custom",
+      path: [...path, "workEnd"],
+      message: "workEnd must differ from workStart",
+    });
+    return;
+  }
+  if (hours.quietBefore === hours.quietAfter) {
+    ctx.addIssue({
+      code: "custom",
+      path: [...path, "quietAfter"],
+      message: "quietAfter must differ from quietBefore",
+    });
+    return;
+  }
+  // Measure clockwise from the start of the allowed window so overnight windows compare correctly.
+  const from = clockMinutes(hours.quietBefore);
+  const allowed = minutesAhead(from, clockMinutes(hours.quietAfter));
+  const workStart = minutesAhead(from, clockMinutes(hours.workStart));
+  const workEnd = minutesAhead(from, clockMinutes(hours.workEnd));
+  if (workStart > allowed || workEnd > allowed || workStart >= workEnd)
+    ctx.addIssue({
+      code: "custom",
+      path: [...path, "workStart"],
+      message: "Work hours must fit inside quietBefore–quietAfter",
+    });
+}
+
 const zoneObject = z
   .object({
     id: z
@@ -115,39 +166,31 @@ const zoneObject = z
     holidays: z.array(dateSchema).max(366).optional(),
     holidayPreset: z.enum(holidayPresetIds).optional(),
     busy: z.array(busyIntervalSchema).max(5000).optional(),
+    specialHours: z.array(specialHoursSchema).max(24).optional(),
     prayer: prayerSchema.optional(),
   })
   .strict();
 
 export const zoneSchema = zoneObject
   .superRefine((zone, ctx) => {
-    if (zone.workStart === zone.workEnd)
-      ctx.addIssue({
-        code: "custom",
-        path: ["workEnd"],
-        message: "workEnd must differ from workStart",
-      });
-    if (zone.quietBefore === zone.quietAfter)
-      ctx.addIssue({
-        code: "custom",
-        path: ["quietAfter"],
-        message: "quietAfter must differ from quietBefore",
-      });
-    if (
-      zone.workStart !== zone.workEnd &&
-      zone.quietBefore !== zone.quietAfter
-    ) {
-      const from = clockMinutes(zone.quietBefore);
-      const allowed = minutesAhead(from, clockMinutes(zone.quietAfter));
-      const workStart = minutesAhead(from, clockMinutes(zone.workStart));
-      const workEnd = minutesAhead(from, clockMinutes(zone.workEnd));
-      if (workStart > allowed || workEnd > allowed || workStart >= workEnd)
+    checkWindows(zone, ctx, []);
+    zone.specialHours?.forEach((period, index) => {
+      if (period.from > period.to)
         ctx.addIssue({
           code: "custom",
-          path: ["workStart"],
-          message: "Work hours must fit inside quietBefore–quietAfter",
+          path: ["specialHours", index, "to"],
+          message: "to must be on or after from",
         });
-    }
+      checkWindows(
+        {
+          ...period,
+          quietBefore: period.quietBefore ?? zone.quietBefore,
+          quietAfter: period.quietAfter ?? zone.quietAfter,
+        },
+        ctx,
+        ["specialHours", index],
+      );
+    });
     if (zone.weekend && new Set(zone.weekend).size !== zone.weekend.length)
       ctx.addIssue({
         code: "custom",

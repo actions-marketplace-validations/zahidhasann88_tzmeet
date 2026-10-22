@@ -1002,3 +1002,77 @@ describe("busy calendars", () => {
     expect(output.stderr).toContain(message);
   });
 });
+
+describe("special hours and rotation", () => {
+  const pair = [
+    "--zones",
+    "UTC,Asia/Tokyo",
+    "--date",
+    "2026-11-02",
+    "--days",
+    "1",
+    "--step",
+    "60",
+    "--weekend",
+    "UTC=none",
+    "--weekend",
+    "Asia/Tokyo=none",
+    "--work",
+    "09:00-17:00",
+    "--quiet",
+    "07:00-21:00",
+  ];
+
+  it("prints a fair rotation after the table and in JSON", () => {
+    const text = invoke([...pair, "--rotation", "2", "--top", "3"]);
+    expect(text.code, text.stderr).toBe(0);
+    expect(text.stdout).toContain("Fair rotation (2 times, alternate weekly):");
+    expect(text.stdout).toContain(
+      "UTC 07:00 / Tokyo 16:00  (outside work hours: UTC)",
+    );
+    const result = JSON.parse(
+      invoke([...pair, "--rotation", "3", "--json"]).stdout,
+    );
+    expect(result.rotation.size).toBe(3);
+    expect(json(pair)).not.toHaveProperty("rotation");
+  });
+
+  it("applies --ramadan and --special-hours", () => {
+    const dhaka = (extra: string[]) =>
+      json([
+        "--zones",
+        "Asia/Dhaka,Europe/London",
+        "--date",
+        "2027-02-10",
+        "--days",
+        "1",
+        "--step",
+        "60",
+        "--top",
+        "50",
+        ...extra,
+      ]).slots.find((slot) => slot.start.includes("T10:00"))!.zones[0]!
+        .classification;
+    expect(dhaka([])).toBe("ideal");
+    expect(dhaka(["--ramadan", "Asia/Dhaka=09:00-15:30"])).toBe("acceptable");
+    expect(
+      dhaka([
+        "--special-hours",
+        "Asia/Dhaka=2027-02-01..2027-02-28@09:00-14:00",
+      ]),
+    ).toBe("acceptable");
+  });
+
+  it.each([
+    [["--rotation", "4"], "--rotation must be 2 or 3"],
+    [
+      ["--special-hours", "UTC=2026-11-02@09:00-15:00"],
+      "--special-hours must use",
+    ],
+    [["--ramadan", "UTC=9-3"], "--ramadan must use HH:mm-HH:mm"],
+  ])("exits 1 for %j", (extra, message) => {
+    const output = invoke([...pair, ...extra]);
+    expect(output.code).toBe(1);
+    expect(output.stderr).toContain(message);
+  });
+});

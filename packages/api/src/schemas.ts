@@ -80,7 +80,11 @@ const repeated = (field: string) =>
             ? ["Asia/Dhaka=2026-12-16"]
             : field === "holidayPreset"
               ? ["Asia/Dhaka=BD"]
-              : ["Asia/Dhaka=fri,sat"],
+              : field === "specialHours"
+                ? ["Europe/London=2026-12-21..2026-12-31@10:00-16:00"]
+                : field === "ramadan"
+                  ? ["Asia/Dhaka=09:00-15:30"]
+                  : ["Asia/Dhaka=fri,sat"],
       description: "Repeat parameter for each IANA_ZONE=value override",
       param: { style: "form", explode: true },
     });
@@ -104,6 +108,10 @@ export const resultQuerySchema = z
       .enum(["json", "text", "ics"])
       .default("json")
       .openapi({ example: "json" }),
+    rotation: z
+      .enum(["2", "3"])
+      .optional()
+      .openapi({ description: "Also suggest 2 or 3 times to alternate weekly (JSON only)", example: "2" }),
   })
   .strict();
 export const slotsGetQuerySchema = resultQuerySchema.extend({
@@ -124,6 +132,8 @@ export const slotsGetQuerySchema = resultQuerySchema.extend({
   weekend: repeated("weekend"),
   holiday: repeated("holiday"),
   holidayPreset: repeated("holidayPreset"),
+  specialHours: repeated("specialHours"),
+  ramadan: repeated("ramadan"),
   quiet: z.string().optional().openapi({ example: "08:00-21:00" }),
   prayerBuffer: numeric("prayerBuffer", 0, 180),
   prayerLocation: z.string().optional().openapi({ example: "Dhaka" }),
@@ -229,10 +239,17 @@ export const diagnosticsSchema = z.object({
   message: z.string(),
   suggestion: z.string(),
 });
+export const rotationSchema = z.object({
+  size: z.number().int(),
+  picks: z.array(z.object({ time: z.string(), slot: slotSchema, inconvenient: z.array(z.string()) })),
+  zones: z.array(z.object({ id: z.string(), label: z.string(), inconvenientTurns: z.number().int() })),
+  message: z.string(),
+});
 export const slotsResultSchema = z
   .object({
     slots: z.array(slotSchema),
     diagnostics: diagnosticsSchema,
+    rotation: rotationSchema.nullable().optional(),
     meta: z.object({
       count: z.number().int(),
       generatedAt: z.string(),
@@ -359,7 +376,7 @@ const weeks = z
   .default("26")
   .openapi({ description: "Weeks to follow (1–52)", example: "30" });
 export const recurringQuerySchema = slotsGetQuerySchema
-  .omit({ top: true, format: true, days: true, step: true })
+  .omit({ top: true, format: true, rotation: true, days: true, step: true })
   .extend({
     date: slotsGetQuerySchema.shape.date.openapi({
       example: "2026-10-12",

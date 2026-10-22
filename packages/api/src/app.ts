@@ -16,6 +16,7 @@ import {
   listTimeZones,
   parseScheduleInput,
   recurringImpact,
+  fairRotation,
   validateInput,
   ScheduleInputError,
   InputValidationError,
@@ -345,7 +346,7 @@ export function createApp(options: AppOptions = {}) {
       throw validationError(new InputValidationError(checked.errors), input);
     return checked.data;
   };
-  const slots = (input: FindSlotsInput, top: number) => {
+  const slots = (input: FindSlotsInput, top: number, rotation?: "2" | "3") => {
     const result = findSlots(validate(input));
     const selected = result.slots.slice(0, top);
     return {
@@ -353,6 +354,8 @@ export function createApp(options: AppOptions = {}) {
       response: {
         slots: selected,
         diagnostics: result.diagnostics,
+        // The rotation looks at every slot found, not only the returned `top`.
+        ...(rotation ? { rotation: fairRotation(result, { size: Number(rotation) as 2 | 3 }) } : {}),
         meta: {
           count: selected.length,
           generatedAt: now().toISOString(),
@@ -392,7 +395,7 @@ export function createApp(options: AppOptions = {}) {
   app.openapi(postSlots, (c) => {
     const body = c.req.valid("json");
     const query = c.req.valid("query");
-    return renderSlots(c, slots(body, query.top), query.format);
+    return renderSlots(c, slots(body, query.top, query.rotation), query.format);
   });
   app.openapi(getSlots, (c) => {
     const query = c.req.valid("query");
@@ -402,8 +405,10 @@ export function createApp(options: AppOptions = {}) {
       weekend: array(query.weekend),
       holiday: array(query.holiday),
       holidayPreset: array(query.holidayPreset),
+      specialHours: array(query.specialHours),
+      ramadan: array(query.ramadan),
     });
-    const result = slots(input, query.top);
+    const result = slots(input, query.top, query.rotation);
     const at = now().getTime();
     if (
       !options.apiKeys?.length &&
@@ -466,6 +471,8 @@ export function createApp(options: AppOptions = {}) {
       weekend: array(query.weekend),
       holiday: array(query.holiday),
       holidayPreset: array(query.holidayPreset),
+      specialHours: array(query.specialHours),
+      ramadan: array(query.ramadan),
     });
     if (!options.apiKeys?.length) c.header("Cache-Control", "public, max-age=300");
     return c.json(
