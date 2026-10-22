@@ -36,6 +36,7 @@ if (result.slots.length === 0) {
 - `resolveLocal(zone, localDateTime)` – tells you whether a local time is `ok`, `skipped` (inside a gap) or `ambiguous` (happens twice), with the real instants.
 - `explainCron({ expression, from, zone?, dialect?, count?, displayZones? })` – explains a Unix, Kubernetes, Spring or Quartz cron expression in plain English, lists its next runs in any zones, and warns about runs that daylight saving skips or repeats. Each engine's own DST behaviour is applied.
 - `parseCron(expression, dialect?)` – checks a cron expression and returns field-by-field errors.
+- `recurringImpact({ zones, startDate, time, weeks?, durationMinutes? })` – follows a weekly meeting (fixed at `time` in the first zone) through the coming weeks and shows where each zone's local time moves because of daylight saving, and why.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 

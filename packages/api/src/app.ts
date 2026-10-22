@@ -15,6 +15,7 @@ import {
   getTimeZoneInfo,
   listTimeZones,
   parseScheduleInput,
+  recurringImpact,
   validateInput,
   ScheduleInputError,
   InputValidationError,
@@ -37,6 +38,8 @@ import {
   cronQuerySchema,
   cronResultSchema,
   errorSchema,
+  recurringQuerySchema,
+  recurringResultSchema,
   healthSchema,
   resultQuerySchema,
   slotsGetQuerySchema,
@@ -210,6 +213,22 @@ const getCron = createRoute({
     ...errorResponses,
   },
 });
+const getRecurring = createRoute({
+  method: "get",
+  path: "/v1/recurring",
+  tags: ["Slots"],
+  summary:
+    "Follow a weekly meeting through DST changes: each zone's local time, week by week",
+  request: { query: recurringQuerySchema },
+  responses: {
+    200: {
+      description:
+        "Every occurrence, periods of unchanged local times with their causes, and warnings",
+      content: json(recurringResultSchema),
+    },
+    ...errorResponses,
+  },
+});
 const getHealth = createRoute({
   method: "get",
   path: "/v1/health",
@@ -225,6 +244,7 @@ const methods: Record<string, readonly string[]> = {
   "/v1/zones": ["GET", "HEAD"],
   "/v1/convert": ["GET", "HEAD"],
   "/v1/cron": ["GET", "HEAD"],
+  "/v1/recurring": ["GET", "HEAD"],
   "/v1/health": ["GET", "HEAD"],
   "/openapi.json": ["GET", "HEAD"],
   "/docs": ["GET", "HEAD"],
@@ -438,6 +458,27 @@ export function createApp(options: AppOptions = {}) {
       );
     }
   });
+  app.openapi(getRecurring, (c) => {
+    const { time, weeks, ...query } = c.req.valid("query");
+    const input = parseScheduleInput({
+      ...query,
+      zoneWork: array(query.zoneWork),
+      weekend: array(query.weekend),
+      holiday: array(query.holiday),
+    });
+    if (!options.apiKeys?.length) c.header("Cache-Control", "public, max-age=300");
+    return c.json(
+      recurringImpact({
+        zones: input.zones,
+        startDate: input.startDate,
+        durationMinutes: input.durationMinutes,
+        ...(input.prayer ? { prayer: input.prayer } : {}),
+        time,
+        weeks,
+      }),
+      200,
+    );
+  });
   app.openapi(getHealth, (c) => {
     c.header("Cache-Control", "public, max-age=30");
     return c.json({ status: "ok" as const, version: API_VERSION }, 200);
@@ -526,6 +567,7 @@ export function createApp(options: AppOptions = {}) {
       ["/v1/zones", "zones"],
       ["/v1/convert", "convert"],
       ["/v1/cron", "cron"],
+      ["/v1/recurring", "recurring"],
       ["/v1/health", "health"],
     ] as const) {
       for (const method of ["get", "post"] as const) {

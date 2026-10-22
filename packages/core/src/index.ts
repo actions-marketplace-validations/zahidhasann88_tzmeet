@@ -67,6 +67,15 @@ export type {
   ParsedCron,
 } from "./cron/parse.js";
 export { describeCron } from "./cron/describe.js";
+export { recurringImpact, recurringSchema } from "./recurring.js";
+export type {
+  RecurringImpact,
+  RecurringInput,
+  RecurringOccurrence,
+  RecurringPeriod,
+  RecurringWarning,
+  RecurringZoneTime,
+} from "./recurring.js";
 export { explainCron, cronExplainSchema } from "./cron/schedule.js";
 export type {
   CronExplainInput,

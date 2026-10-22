@@ -407,3 +407,42 @@ describe('cron subcommand', () => {
     expect(output.stderr).toContain(message);
   });
 });
+
+describe('recurring subcommand', () => {
+  const team = ['--zones', 'Europe/London,America/New_York,Asia/Dhaka', '--date', '2026-10-12'];
+
+  it('prints one row per period with the clock change that caused it', () => {
+    const output = invoke(['recurring', ...team, '--time', '14:00', '--weeks', '30']);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toMatchSnapshot();
+    expect(output.stdout).toContain('Every Monday at 14:00 Europe/London (30 min), next 30 weeks');
+    expect(output.stdout).toContain('2026-10-26               | 1     | 14:00 *');
+    expect(output.stdout).toContain('i Week of 2026-10-26: New York at 10:00 instead of 09:00');
+  });
+
+  it('shares zone flags and config with the main search, and prints JSON', () => {
+    configFile({ zones: [{ id: 'Europe/London' }, { id: 'Asia/Dhaka', quietAfter: '20:30' }], durationMinutes: 45 });
+    const output = invoke(['recurring', '--date', '2026-10-19', '--time', '14:00', '--weeks', '2', '--json']);
+    expect(output.code, output.stderr).toBe(0);
+    const result = JSON.parse(output.stdout);
+    expect(result.durationMinutes).toBe(45);
+    expect(result.periods.map((period: { zones: { classification: string }[] }) => period.zones[1]!.classification)).toEqual(['acceptable', 'blocked']);
+  });
+
+  it('defaults --date to today in the first zone', () => {
+    const output = invoke(['recurring', '--zones', 'Asia/Dhaka', '--time', '10:00', '--weeks', '1', '--json']);
+    expect(output.code, output.stderr).toBe(0);
+    expect(JSON.parse(output.stdout).occurrences[0].date).toBe('2026-11-02');
+  });
+
+  it.each([
+    [['recurring', ...team], "required option '--time <HH:mm>'"],
+    [['recurring', ...team, '--time', '9'], 'Time must use HH:mm'],
+    [['recurring', ...team, '--time', '09:00', '--weeks', '200'], 'weeks'],
+    [['recurring', '--zones', 'Asia/Dhka', '--date', '2026-10-12', '--time', '09:00'], 'Unknown IANA time zone']
+  ])('exits 1 for %j', (args, message) => {
+    const output = invoke(args);
+    expect(output.code).toBe(1);
+    expect(output.stderr).toContain(message);
+  });
+});

@@ -3,6 +3,7 @@ import {
   explainCron,
   findSlots,
   parseScheduleInput,
+  recurringImpact,
   type FindSlotsInput,
 } from "@tzmeet/core";
 import { API_VERSION, createApp } from "../src/app.js";
@@ -10,6 +11,7 @@ import {
   conversionResultSchema,
   cronResultSchema,
   errorSchema,
+  recurringResultSchema,
   healthSchema,
   slotsResultSchema,
 } from "../src/schemas.js";
@@ -644,5 +646,42 @@ describe("cron over HTTP", () => {
     });
     expect(response.status).toBe(405);
     expect(response.headers.get("Allow")).toBe("GET, HEAD");
+  });
+});
+
+describe('recurring meetings over HTTP', () => {
+  const recurring = (query: Record<string, string | string[]>) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) for (const item of Array.isArray(value) ? value : [value]) params.append(key, item);
+    return app.request(`/v1/recurring?${params}`);
+  };
+
+  it('returns core recurringImpact output, sharing the slots query parser', async () => {
+    const response = await recurring({ zones: 'Europe/London,Asia/Dhaka', date: '2026-10-19', time: '15:00', weeks: '3', duration: '45', quiet: '08:00-21:00', weekend: 'Asia/Dhaka=fri,sat' });
+    expect(response.status).toBe(200);
+    const body = recurringResultSchema.parse(await response.json());
+    expect(body).toEqual(recurringImpact({ zones: [{ id: 'Europe/London', quietBefore: '08:00', quietAfter: '21:00' }, { id: 'Asia/Dhaka', quietBefore: '08:00', quietAfter: '21:00', weekend: [5, 6] }], startDate: '2026-10-19', time: '15:00', weeks: 3, durationMinutes: 45 }));
+    expect(body.periods.map(period => [period.from, period.zones[1]!.localTime, period.zones[1]!.classification])).toEqual([
+      ['2026-10-19', '20:00', 'acceptable'],
+      ['2026-10-26', '21:00', 'blocked']
+    ]);
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+  });
+
+  it('defaults to 26 weeks', async () => {
+    const body = recurringResultSchema.parse(await (await recurring({ zones: 'UTC', date: '2026-10-19', time: '09:00' })).json());
+    expect(body.occurrences).toHaveLength(26);
+  });
+
+  it.each([
+    [{ zones: 'UTC', date: '2026-10-19' }, 'time'],
+    [{ zones: 'UTC', date: '2026-10-19', time: '9am' }, 'time'],
+    [{ zones: 'UTC', date: '2026-10-19', time: '09:00', weeks: '53' }, 'weeks'],
+    [{ zones: 'UTC', time: '09:00' }, 'date'],
+    [{ zones: 'UTC,Asia/Dhka', date: '2026-10-19', time: '09:00' }, 'zones[1].id'],
+    [{ zones: 'UTC', date: '2026-10-19', time: '09:00', top: '5' }, 'top']
+  ])('rejects %j', async (query, field) => {
+    const error = await publicError(await recurring(query));
+    expect(error.details).toContainEqual(expect.objectContaining({ field }));
   });
 });

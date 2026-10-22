@@ -84,3 +84,17 @@ export const cronResultSchema = z.object({
   skipped: z.array(z.object({ scheduled: z.string(), reason: z.literal('gap') })),
   warnings: z.array(z.object({ code: z.string(), severity: z.enum(['warning', 'info']), message: z.string(), at: z.string().optional() }))
 }).openapi('CronExplanation');
+const weeks = z.string().regex(/^\d+$/, 'weeks must be an integer from 1 to 52')
+  .transform(Number).pipe(z.number().int().min(1, 'weeks must be at least 1').max(52, 'weeks must be at most 52')).default('26').openapi({ description: 'Weeks to follow (1–52)', example: '30' });
+export const recurringQuerySchema = slotsGetQuerySchema.omit({ top: true, format: true, days: true, step: true }).extend({
+  date: slotsGetQuerySchema.shape.date.openapi({ example: '2026-10-12', description: 'First meeting date in the first zone; it repeats on this weekday' }),
+  time: z.string().openapi({ example: '14:00', description: 'Meeting time (HH:mm) in the first zone' }),
+  weeks
+});
+const recurringZoneSchema = z.object({ id: z.string(), label: z.string(), localStart: z.string(), localTime: z.string(), dayOffset: z.number().int(), classification: z.enum(['ideal', 'acceptable', 'blocked']), constraints: z.array(z.enum(['weekend', 'holiday', 'quiet', 'prayer'])) });
+export const recurringResultSchema = z.object({
+  anchor: z.string(), time: z.string(), weekday: z.string(), durationMinutes: z.number().int(), weeks: z.number().int(),
+  occurrences: z.array(z.object({ date: z.string(), start: z.string(), end: z.string(), status: z.enum(['ok', 'shifted', 'ambiguous']), zones: z.array(recurringZoneSchema) })),
+  periods: z.array(z.object({ from: z.string(), to: z.string(), weeks: z.number().int(), causes: z.array(z.string()), zones: z.array(recurringZoneSchema) })),
+  warnings: z.array(z.object({ severity: z.enum(['warning', 'info']), message: z.string(), date: z.string() }))
+}).openapi('RecurringImpact');

@@ -4,11 +4,13 @@ import {
   findSlots,
   listTimeZones,
   parseIntegerOption,
+  recurringImpact,
   type CronDialect,
 } from "@tzmeet/core";
 import { readConfig, resolveOptions, type CliFlags } from "./config.js";
 import { formatTable, selectTop } from "./output.js";
 import { defaultCronZones, formatCron } from "./cron.js";
+import { formatRecurring } from "./recurring.js";
 
 export interface CliContext {
   cwd?: string;
@@ -22,7 +24,6 @@ const collect = (value: string, previous: string[] = []): string[] => [
   value,
 ];
 
-/** Run the CLI without forcing process exit. Errors/help are testable with injected I/O. */
 export function runCLI(
   args: string[] = process.argv.slice(2),
   context: CliContext = {},
@@ -112,6 +113,7 @@ Examples:
   tzmeet --config team.json --zone-work America/New_York=08:00-17:00
   tzmeet zones london
   tzmeet cron "30 2 * * *" --zone America/New_York
+  tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
 
 Precedence: config/defaults < global flags < per-zone flags.
 Default weekend is Sat/Sun, or Fri/Sat for Dhaka and other Fri/Sat countries.
@@ -210,6 +212,38 @@ Quote the expression so the shell doesn't expand *:
         );
       },
     );
+  program
+    .command("recurring")
+    .description(
+      "Follow a weekly meeting through DST changes: local times per zone, week by week",
+    )
+    .requiredOption("--time <HH:mm>", "meeting time in the first zone")
+    .option("--weeks <count>", "how many weeks to check, 1-104 (default: 26)")
+    .addHelpText(
+      "after",
+      `
+The meeting repeats every week on the weekday of --date, at --time in the first zone.
+Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holiday,
+--quiet, --prayer-*, --config) work the same as for the main search.
+  tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
+  tzmeet recurring --zones America/New_York,Asia/Dhaka --time 09:00 --weeks 52 --json
+`,
+    )
+    .action((options: { time: string; weeks?: string }) => {
+      const flags = program.opts<CliFlags>();
+      const config = readConfig(context.cwd ?? process.cwd(), flags.config);
+      const { input } = resolveOptions(config, flags, context.now?.() ?? new Date());
+      const result = recurringImpact({
+        zones: input.zones,
+        startDate: input.startDate,
+        durationMinutes: input.durationMinutes,
+        ...(input.prayer ? { prayer: input.prayer } : {}),
+        time: options.time,
+        weeks: parseIntegerOption(options.weeks, "weeks", 26),
+      });
+      writeOut(flags.json ? `${JSON.stringify(result, null, 2)}
+` : formatRecurring(result));
+    });
   try {
     program.parse(args, { from: "user" });
     return 0;

@@ -367,3 +367,19 @@ test("cron explainer: DST warnings, field errors, zones, link round-trip and acc
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('checks a slot over the coming weeks of DST changes', async ({ page }) => {
+  await open(page);
+  const toggle = page.getByRole('button', { name: 'Check slot 1 over the coming weeks', exact: true });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const panel = page.locator('#over-time-0');
+  await expect(panel).toContainText('next 26 weeks');
+  await expect(panel).toContainText('Local times change');
+  await expect(panel.getByRole('cell', { name: 'America/New_York clocks went forward 1 hour on 2027-03-14' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const audit = await new AxeBuilder({ page }).include('#over-time-0').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  await toggle.click();
+  await expect(panel).toHaveCount(0);
+});

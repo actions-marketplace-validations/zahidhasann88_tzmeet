@@ -3,6 +3,7 @@ import {
   explainCron,
   findSlots,
   getTimeZoneInfo,
+  recurringImpact,
 } from "@tzmeet/core";
 export const slotRequestExample = {
   zones: [
@@ -43,6 +44,12 @@ export function responseExamples(version: string) {
       from: "2027-03-12T00:00:00Z",
       count: 3,
       displayZones: ["Asia/Dhaka", "UTC"],
+    }),
+    recurring: recurringImpact({
+      zones: [{ id: "Europe/London" }, { id: "America/New_York" }],
+      startDate: "2026-10-19",
+      time: "14:00",
+      weeks: 3,
     }),
     health: { status: "ok", version },
   };

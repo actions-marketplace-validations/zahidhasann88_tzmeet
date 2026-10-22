@@ -29,6 +29,7 @@ import {
 import { downloadCalendar, inviteText } from "./invite";
 import { makeTimeline } from "./timeline";
 import CronPage from "./Cron";
+import RecurringPanel from "./Recurring";
 import { CRON_ROUTE, isCronRoute } from "./cron-state";
 
 type StateSetter = Dispatch<SetStateAction<WebState | null>>;
@@ -931,6 +932,7 @@ function WorkspaceResults({
     }
   }, [checked]);
   const result = search.result;
+  const [overTime, setOverTime] = useState<string | null>(null);
   const selected =
     result?.slots.find((slot) => slot.start === state.selected) ??
     result?.slots[0];
@@ -1322,6 +1324,13 @@ function WorkspaceResults({
                   </p>
                 </div>
               )}
+              {overTime === slot.start && checked.success && (
+                <RecurringPanel
+                  id={`over-time-${index}`}
+                  input={checked.data}
+                  slot={slot}
+                />
+              )}
               <div className="slot-actions">
                 <button
                   onClick={() => {
@@ -1364,6 +1373,17 @@ function WorkspaceResults({
                 >
                   <Icon name="link" />
                   Copy link
+                </button>
+                <button
+                  aria-expanded={overTime === slot.start}
+                  aria-controls={`over-time-${index}`}
+                  aria-label={`Check slot ${index + 1} over the coming weeks`}
+                  onClick={() =>
+                    setOverTime(overTime === slot.start ? null : slot.start)
+                  }
+                >
+                  <Icon name="clock" />
+                  Check over time
                 </button>
                 <button className="view-timeline" onClick={() => choose(slot)}>
                   On timeline

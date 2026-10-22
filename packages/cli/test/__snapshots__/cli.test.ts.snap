@@ -162,3 +162,22 @@ Date column uses the first zone. Each zone shows its own local date and UTC offs
 4 slots found; 44 of 48 candidates rejected.
 "
 `;
+
+exports[`recurring subcommand > prints one row per period with the clock change that caused it 1`] = `
+"Every Monday at 14:00 Europe/London (30 min), next 30 weeks
+Local times change 4 times. * ideal / ~ acceptable / x blocked
+
+Weeks                    | Count | London (Europe/London) | New York (America/New_York) | Dhaka (Asia/Dhaka) | What changed
+-------------------------+-------+------------------------+-----------------------------+--------------------+----------------------------------------------------------
+2026-10-12 to 2026-10-19 | 2     | 14:00 *                | 09:00 *                     | 19:00 ~            |
+2026-10-26               | 1     | 14:00 *                | 10:00 *                     | 20:00 ~            | Europe/London clocks went back 1 hour on 2026-10-25
+2026-11-02 to 2027-03-08 | 19    | 14:00 *                | 09:00 *                     | 20:00 ~            | America/New_York clocks went back 1 hour on 2026-11-01
+2027-03-15 to 2027-03-22 | 2     | 14:00 *                | 10:00 *                     | 20:00 ~            | America/New_York clocks went forward 1 hour on 2027-03-14
+2027-03-29 to 2027-05-03 | 6     | 14:00 *                | 09:00 *                     | 19:00 ~            | Europe/London clocks went forward 1 hour on 2027-03-28
+
+Warnings:
+  i Week of 2026-10-26: New York at 10:00 instead of 09:00; Dhaka at 20:00 instead of 19:00 (outside work hours). Europe/London clocks went back 1 hour on 2026-10-25.
+  i 2026-11-02 to 2027-03-08 (19 weeks): Dhaka at 20:00 instead of 19:00 (outside work hours). America/New_York clocks went back 1 hour on 2026-11-01.
+  i 2027-03-15 to 2027-03-22 (2 weeks): New York at 10:00 instead of 09:00; Dhaka at 20:00 instead of 19:00 (outside work hours). America/New_York clocks went forward 1 hour on 2027-03-14.
+"
+`;
