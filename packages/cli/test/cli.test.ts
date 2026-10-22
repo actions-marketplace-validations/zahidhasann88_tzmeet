@@ -1076,3 +1076,14 @@ describe("special hours and rotation", () => {
     expect(output.stderr).toContain(message);
   });
 });
+
+describe('optional attendees', () => {
+  it('marks optional zones and never lets them block', () => {
+    const args = ['--zones', 'Europe/London,Asia/Dhaka,America/New_York', '--date', '2026-11-02', '--days', '1', '--step', '60', '--top', '20'];
+    const output = invoke([...args, '--optional', 'America/New_York']);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toContain('* ideal / ~ acceptable / x unavailable (optional)');
+    expect(output.stdout).toMatch(/-0500 x \(optional\)/);
+    expect(json([...args, '--optional', 'America/New_York']).slots.length).toBeGreaterThan(json(args).slots.length);
+  });
+});

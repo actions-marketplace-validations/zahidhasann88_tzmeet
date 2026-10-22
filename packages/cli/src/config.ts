@@ -19,6 +19,7 @@ export interface CliFlags {
   specialHours?: string[];
   ramadan?: string[];
   rotation?: string;
+  optional?: string[];
   quiet?: string;
   prayerBuffer?: string;
   prayerLocation?: string;

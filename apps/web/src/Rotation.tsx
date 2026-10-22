@@ -47,7 +47,7 @@ export default function RotationCard({ result }: { result: FindSlotsResult }) {
                   }).toFormat("HH:mm")}
                 </strong>
                 <span className={`badge badge-${zone.classification}`}>
-                  {zone.classification === "ideal" ? "Ideal" : "Acceptable"}
+                  {zone.classification === "ideal" ? "Ideal" : zone.classification === "acceptable" ? "Acceptable" : "Unavailable"}
                 </span>
               </span>
             ))}

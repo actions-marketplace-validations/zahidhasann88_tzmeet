@@ -76,14 +76,130 @@ export function parseState(value: unknown): WebState {
   return { ...result, input: input.data };
 }
 
-/** Versioned, percent-encoded JSON preserves zone ordering and every input/view setting. */
+type Zone = NormalizedInput["zones"][number];
+const same = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
+const viewDefaults = {
+  theme: "light",
+  selected: null,
+  expanded: null,
+  panels: [],
+  shown: 10,
+  customDuration: false,
+} as const;
+const inputDefaults = {
+  days: 5,
+  durationMinutes: 30,
+  stepMinutes: 15,
+} as const;
+const prayerDefault = {
+  location: "Dhaka",
+  method: "Karachi",
+  bufferMinutes: 10,
+};
+
+function toBase64Url(text: string): string {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(text))
+    binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+function fromBase64Url(value: string): string {
+  const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+  return new TextDecoder().decode(
+    Uint8Array.from(binary, (character) => character.charCodeAt(0)),
+  );
+}
+
+/** A zone as just its id when it matches the defaults, else only the fields that differ. */
+function compactZone(zone: Zone): string | Record<string, unknown> {
+  const base = regionalZone(zone.id) as Record<string, unknown>;
+  const changed = Object.fromEntries(
+    Object.entries(zone).filter(
+      ([key, value]) =>
+        key !== "id" && value !== undefined && !same(value, base[key]),
+    ),
+  );
+  return Object.keys(changed).length ? { id: zone.id, ...changed } : zone.id;
+}
+
+/**
+ * Version 2 share format: settings that differ from the defaults, as base64url JSON in
+ * `?s=`. Much shorter than the full state; zone order and every setting still round-trip.
+ */
+function compactState(state: WebState): Record<string, unknown> {
+  const { zones, startDate, ...rest } = state.input;
+  const input: Record<string, unknown> = {
+    zones: zones.map(compactZone),
+    startDate,
+  };
+  for (const [key, value] of Object.entries(rest))
+    if (
+      value !== undefined &&
+      !same(value, inputDefaults[key as keyof typeof inputDefaults])
+    )
+      input[key] = value;
+  const view = Object.fromEntries(
+    Object.entries(viewDefaults)
+      .filter(([key, value]) => !same(state[key as keyof WebState], value))
+      .map(([key]) => [key, state[key as keyof WebState]]),
+  );
+  return {
+    v: 2,
+    input,
+    ...view,
+    ...(same(state.prayerDraft, prayerDefault)
+      ? {}
+      : { prayerDraft: state.prayerDraft }),
+    ...(state.day === state.input.startDate ? {} : { day: state.day }),
+  };
+}
+function expandState(value: unknown): unknown {
+  if (!value || typeof value !== "object" || (value as { v?: unknown }).v !== 2)
+    throw new Error("Unknown share link version");
+  const { input, ...view } = value as {
+    v: 2;
+    input: { zones: (string | { id: string })[]; startDate: string } & Record<
+      string,
+      unknown
+    >;
+  } & Record<string, unknown>;
+  return {
+    ...viewDefaults,
+    prayerDraft: prayerDefault,
+    day: input.startDate,
+    ...view,
+    v: 1,
+    input: {
+      ...inputDefaults,
+      ...input,
+      zones: input.zones.map((zone) =>
+        typeof zone === "string"
+          ? regionalZone(zone)
+          : { ...regionalZone(zone.id), ...zone },
+      ),
+    },
+  };
+}
+
+/** Compact `s=` share parameter (see compactState). */
 export function encodeState(state: WebState): string {
   return new URLSearchParams({
-    state: JSON.stringify(parseState(state)),
+    s: toBase64Url(JSON.stringify(compactState(parseState(state)))),
   }).toString();
 }
+/** Reads `?s=` links and older `?state=` (full JSON) links. */
 export function decodeState(search: string): WebState | null {
-  const raw = new URLSearchParams(search).get("state");
+  const params = new URLSearchParams(search);
+  const compact = params.get("s");
+  if (compact !== null)
+    return parseState(
+      expandState(JSON.parse(fromBase64Url(compact)) as unknown),
+    );
+  const raw = params.get("state");
   if (raw === null) return null;
   return parseState(JSON.parse(raw) as unknown);
 }

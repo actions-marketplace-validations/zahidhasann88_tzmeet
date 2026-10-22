@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -8,7 +9,6 @@ import {
 import { DateTime } from "luxon";
 import {
   cities,
-  findSlots,
   listTimeZones,
   prayerMethods,
   validateInput,
@@ -24,6 +24,7 @@ import {
   type HolidayPreset,
 } from "@tzmeet/core";
 import RotationCard from "./Rotation";
+import { useSlotSearch } from "./search";
 import Icon from "./Icon";
 import {
   decodeState,
@@ -428,6 +429,9 @@ function ZoneSettings({
                     {index === 0 && (
                       <span className="anchor-label">ANCHOR</span>
                     )}
+                    {zone.optional && (
+                      <span className="anchor-label">OPTIONAL</span>
+                    )}
                   </strong>
                   <span>{zone.id}</span>
                 </button>
@@ -494,6 +498,15 @@ function ZoneSettings({
                         change(index, { label: event.target.value })
                       }
                     />
+                  </label>
+                  <label className="inline-check">
+                    <input
+                      type="checkbox"
+                      aria-label={`${zone.label ?? zone.id} attendance is optional`}
+                      checked={!!zone.optional}
+                      onChange={(event) => change(index, { optional: event.target.checked || undefined })}
+                    />
+                    <span>Optional attendee: never blocks a time</span>
                   </label>
                   <div className="field-pair">
                     <label>
@@ -1197,24 +1210,7 @@ function WorkspaceResults({
   notify: (message: string) => void;
 }) {
   const checked = useMemo(() => validateInput(input), [input]);
-  const search = useMemo(() => {
-    if (!checked.success)
-      return {
-        result: null,
-        error: checked.errors
-          .map((error) => `${error.path}: ${error.message}`)
-          .join("; "),
-      };
-    try {
-      return { result: findSlots(checked.data), error: "" };
-    } catch (error) {
-      return {
-        result: null,
-        error:
-          error instanceof Error ? error.message : "Unable to calculate slots.",
-      };
-    }
-  }, [checked]);
+  const search = useSlotSearch(checked);
   const result = search.result;
   const [overTime, setOverTime] = useState<string | null>(null);
   const selected =
@@ -1242,15 +1238,17 @@ function WorkspaceResults({
         DateTime.fromISO(slot.start, { zone: "UTC" }).toISODate() === state.day,
     ) ?? [];
   // A slot link opened fresh scrolls straight to that slot. Runs before App rewrites the URL, so plain visits are unaffected.
+  // A slot link opened fresh scrolls to that slot once its results first arrive.
+  const openedFromLink = useRef(
+    Boolean(state.selected) && /[?&](?:state|s)=/.test(window.location.search),
+  );
   useEffect(() => {
-    if (
-      state.selected &&
-      new URLSearchParams(window.location.search).has("state")
-    )
-      document
-        .getElementById(`slot-${state.selected}`)
-        ?.scrollIntoView({ block: "center" });
-  }, []); // first render only
+    if (!openedFromLink.current || !result) return;
+    openedFromLink.current = false;
+    document
+      .getElementById(`slot-${state.selected}`)
+      ?.scrollIntoView({ block: "center" });
+  }, [result, state.selected]);
   /** URL that opens this exact workspace with one slot selected, expanded and visible. */
   function slotLink(slot: Slot, index: number) {
     const focused = {
@@ -1494,8 +1492,8 @@ function WorkspaceResults({
             <p className="eyebrow">LESS COMPROMISE, FIRST</p>
             <h2 id="results-heading">Your best meeting times</h2>
           </div>
-          <span className="results-count">
-            {result?.slots.length ?? 0} options
+          <span className="results-count" aria-live="polite">
+            {search.pending && !result ? "Searching…" : `${result?.slots.length ?? 0} options`}
           </span>
         </div>
         <p className="results-help">
@@ -1576,8 +1574,11 @@ function WorkspaceResults({
                       <span className={`badge badge-${zone.classification}`}>
                         {zone.classification === "ideal"
                           ? "Ideal"
-                          : "Acceptable"}
+                          : zone.classification === "acceptable"
+                            ? "Acceptable"
+                            : "Unavailable"}
                       </span>
+                      {zone.optional && <span className="badge badge-optional">Optional</span>}
                     </div>
                   </div>
                 ))}

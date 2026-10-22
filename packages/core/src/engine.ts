@@ -309,7 +309,10 @@ function humanReason(zones: ZoneSlot[], input: NormalizedInput): string {
           : "after work";
       return `${kind} (acceptable) for ${zone.label}`;
     });
-  return [ideal.length ? `Ideal for ${ideal.join(" & ")}` : "", ...acceptable]
+  const unavailable = zones
+    .filter((zone) => zone.classification === "blocked")
+    .map((zone) => `unavailable for ${zone.label} (optional)`);
+  return [ideal.length ? `Ideal for ${ideal.join(" & ")}` : "", ...acceptable, ...unavailable]
     .filter(Boolean)
     .join(", ");
 }
@@ -403,6 +406,8 @@ export function findSlots(input: FindSlotsInput): FindSlotsResult {
     let blocked = false;
     classified.forEach((evaluation, i) => {
       const zone = normalized.zones[i]!;
+      // Optional zones never block, and don't count towards the diagnostics.
+      if (zone.optional) return;
       if (evaluation.classification === "blocked") blocked = true;
       for (const constraint of evaluation.constraints) {
         const key = `${zone.id}:${constraint}`;
@@ -434,11 +439,13 @@ export function findSlots(input: FindSlotsInput): FindSlotsResult {
         formattedEnd: localEnd
           .setLocale("en")
           .toFormat("ccc d LLL yyyy, HH:mm ZZZZ"),
-        classification: classified[i]!.classification as "ideal" | "acceptable",
+        classification: classified[i]!.classification,
+        ...(zone.optional ? { optional: true } : {}),
       };
     });
     const baseScore = zones.reduce(
-      (score, zone) => score + (zone.classification === "ideal" ? 2 : 1),
+      (score, zone) =>
+        score + (zone.classification === "ideal" ? 2 : zone.classification === "acceptable" ? 1 : 0),
       0,
     );
     const earliness =

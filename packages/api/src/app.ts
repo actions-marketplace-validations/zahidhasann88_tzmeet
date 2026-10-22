@@ -407,6 +407,7 @@ export function createApp(options: AppOptions = {}) {
       holidayPreset: array(query.holidayPreset),
       specialHours: array(query.specialHours),
       ramadan: array(query.ramadan),
+      optional: array(query.optional),
     });
     const result = slots(input, query.top, query.rotation);
     const at = now().getTime();
@@ -473,6 +474,7 @@ export function createApp(options: AppOptions = {}) {
       holidayPreset: array(query.holidayPreset),
       specialHours: array(query.specialHours),
       ramadan: array(query.ramadan),
+      optional: array(query.optional),
     });
     if (!options.apiKeys?.length) c.header("Cache-Control", "public, max-age=300");
     return c.json(

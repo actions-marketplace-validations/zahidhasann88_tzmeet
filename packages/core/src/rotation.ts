@@ -35,7 +35,7 @@ export function fairRotation(
       time,
       slot,
       burden: slot.zones.map((zone) =>
-        zone.classification === "ideal" ? 0 : 1,
+        zone.optional || zone.classification === "ideal" ? 0 : 1,
       ),
     });
     if (candidates.length === maxCandidates) break;

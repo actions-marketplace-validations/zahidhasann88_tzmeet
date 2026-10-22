@@ -22,10 +22,9 @@ export interface ScheduleTextOptions {
   weekend?: readonly string[];
   holiday?: readonly string[];
   holidayPreset?: readonly string[];
-  /** Repeatable `IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` work hours for a date range. */
   specialHours?: readonly string[];
-  /** Repeatable `IANA_ZONE=HH:mm-HH:mm` work hours during Ramadan (dates are calculated). */
   ramadan?: readonly string[];
+  optional?: readonly string[];
   quiet?: string;
   prayerBuffer?: string;
   prayerLocation?: string;
@@ -252,6 +251,19 @@ export function parseScheduleInput(
         { label: "Ramadan", ...dates, workStart, workEnd },
       ];
     }
+  }
+  for (const id of (options.optional ?? [])
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    const zone = zones.find((candidate) => candidate.id === id);
+    if (!zone)
+      return fail(
+        "optional",
+        `--optional: ${id} is not a selected zone; add it with --zones first`,
+        id,
+      );
+    zone.optional = true;
   }
   let prayer: unknown = defaults.prayer;
   if (

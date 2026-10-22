@@ -100,7 +100,6 @@ export const busyIntervalSchema = z
     path: ["end"],
   });
 
-/** Different hours for a date range, e.g. shorter Ramadan office hours. */
 export const specialHoursSchema = z
   .object({
     label: z.string().trim().min(1).max(40).optional(),
@@ -167,6 +166,8 @@ const zoneObject = z
     holidayPreset: z.enum(holidayPresetIds).optional(),
     busy: z.array(busyIntervalSchema).max(5000).optional(),
     specialHours: z.array(specialHoursSchema).max(24).optional(),
+    /** Optional attendees never block a slot; slots they can attend rank higher. */
+    optional: z.boolean().optional(),
     prayer: prayerSchema.optional(),
   })
   .strict();
@@ -213,6 +214,10 @@ const zonesSchema = z
   .array(zoneSchema)
   .min(1, "Add at least one zone")
   .max(20)
+  .refine(
+    (zones) => zones.some((zone) => !zone.optional),
+    "At least one zone must be required (not optional)",
+  )
   .refine(
     (zones) => new Set(zones.map((zone) => zone.id)).size === zones.length,
     "Time zones must be unique",

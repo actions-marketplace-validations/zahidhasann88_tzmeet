@@ -191,3 +191,29 @@ describe('imported calendars', () => {
     expect(readCalendars({ 'Europe/London': { name: 'notes.txt', text: 'hello' } }, state.input)['Europe/London']).toEqual({ error: "This doesn't look like an iCalendar (.ics) file" });
   });
 });
+
+describe('compact share links', () => {
+  it('are much shorter than the full JSON and still round-trip every setting', () => {
+    const state = defaultState();
+    state.input.startDate = '2026-11-02';
+    state.day = '2026-11-02';
+    const short = encodeState(state);
+    const legacy = new URLSearchParams({ state: JSON.stringify(state) }).toString();
+    expect(short.startsWith('s=')).toBe(true);
+    expect(short.length).toBeLessThan(legacy.length / 4);
+    expect(decodeState(`?${short}`)).toEqual(state);
+    state.input.zones[1] = { ...state.input.zones[1]!, label: 'ঢাকা টিম', workStart: '10:00', holidayPreset: 'GB-ENG', optional: true };
+    state.input.durationMinutes = 45;
+    state.theme = 'dark';
+    state.day = '2026-11-03';
+    state.prayerDraft = { location: { lat: 23.8, lng: 90.4 }, method: 'MWL', bufferMinutes: 5 };
+    expect(decodeState(`?${encodeState(state)}`)).toEqual(state);
+  });
+
+  it('still opens older ?state= links and rejects broken ones', () => {
+    const state = defaultState();
+    expect(decodeState(`?${new URLSearchParams({ state: JSON.stringify(state) })}`)).toEqual(state);
+    expect(() => decodeState('?s=not-base64-json')).toThrow();
+    expect(restoreState('?s=%%%', null).notice).toContain('invalid settings');
+  });
+});

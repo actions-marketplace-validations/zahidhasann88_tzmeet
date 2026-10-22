@@ -7,7 +7,8 @@ export interface ZoneSlot {
   localEnd: string;
   formattedStart: string;
   formattedEnd: string;
-  classification: Exclude<Classification, "blocked">;
+  classification: Classification;
+  optional?: boolean;
 }
 export interface Slot {
   start: string;

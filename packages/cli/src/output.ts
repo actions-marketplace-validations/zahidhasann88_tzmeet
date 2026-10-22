@@ -43,7 +43,7 @@ function localCell(zone: ZoneSlot): string {
     start.offset === end.offset
       ? start.toFormat("ZZZ")
       : `${start.toFormat("ZZZ")}/${end.toFormat("ZZZ")}`;
-  return `${start.toFormat("ccc d LLL HH:mm")}-${endLabel} ${offset} ${zone.classification === "ideal" ? "*" : "~"}`;
+  return `${start.toFormat("ccc d LLL HH:mm")}-${endLabel} ${offset} ${zone.classification === "ideal" ? "*" : zone.classification === "acceptable" ? "~" : "x"}${zone.optional ? " (optional)" : ""}`;
 }
 
 export function formatTable(result: CliResult, input: NormalizedInput): string {
@@ -73,7 +73,7 @@ export function formatTable(result: CliResult, input: NormalizedInput): string {
   const divider = widths.map((width) => "-".repeat(width)).join("-+-");
   return [
     `tzmeet | ${input.durationMinutes}-minute meetings | ${input.stepMinutes}-minute grid`,
-    `Showing ${result.slots.length} of ${result.totalSlots} slots. * ideal / ~ acceptable`,
+    `Showing ${result.slots.length} of ${result.totalSlots} slots. * ideal / ~ acceptable${result.slots[0]!.zones.some(zone => zone.optional) ? ' / x unavailable (optional)' : ''}`,
     "",
     line(allRows[0]!),
     divider,

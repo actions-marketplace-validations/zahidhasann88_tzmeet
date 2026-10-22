@@ -102,6 +102,11 @@ export function runCLI(
       collect,
     )
     .option(
+      "--optional <IANA_ZONE>",
+      "attendees in this zone are optional: they never block a slot; repeatable or comma-separated",
+      collect,
+    )
+    .option(
       "--rotation <2|3>",
       "also suggest 2 or 3 times to alternate weekly so no city always gets the inconvenient slot",
     )

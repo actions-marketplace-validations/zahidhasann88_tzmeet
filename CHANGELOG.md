@@ -4,6 +4,23 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Daylight saving helpers: `listTransitions` lists a zone's clock changes (gap or fold), and `resolveLocal` says whether a local time exists, is skipped or happens twice.
+- Cron explainer for Unix, Kubernetes, Spring and Quartz syntax: plain-English description, next runs in any zones, and warnings about runs that DST skips or repeats, using each engine's own behaviour. Available as `explainCron`, `tzmeet cron`, `GET /v1/cron` and a `#/cron` page in the web app.
+- Recurring meeting report: follow a weekly meeting through DST changes and see where each zone's local time moves, and why (`recurringImpact`, `tzmeet recurring`, `GET /v1/recurring`, "Check over time" on each web result).
+- Public holiday presets for Bangladesh, the UK (England and Wales) and the US (`holidayPreset`, `--holiday-preset`). Islamic holidays are approximate.
+- Busy times from calendar exports (`.ics`), including repeating events (`parseIcsBusy`, `--busy`, per-zone import in the web app, where calendars stay in the browser and aren't shared).
+- Special hours for a date range, with a Ramadan shortcut (`specialHours`, `ramadanDates`, `--special-hours`, `--ramadan`).
+- Fair rotation: 2 or 3 times to alternate weekly so no city always gets the inconvenient slot (`fairRotation`, `--rotation`, `rotation=` on `/v1/slots`, and a card in the web app).
+- Optional attendees, who never block a time but make times they can attend rank higher (`optional`, `--optional`).
+
+### Changed
+
+- The web app runs slot searches in a Web Worker, so long ranges no longer freeze the page.
+- Share links use a compact format (`?s=`) that stores only settings that differ from the defaults. Older `?state=` links still open.
+- `ZoneSlot.classification` can be `blocked` for optional zones.
+
 ### Removed
 
 - Dependabot configuration.

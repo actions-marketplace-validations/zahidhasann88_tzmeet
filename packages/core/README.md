@@ -52,6 +52,7 @@ if (result.slots.length === 0) {
 | `holidayPreset` | off (`BD`, `GB-ENG` or `US`; see `presetHolidays(preset, year)`) |
 | `busy` | `[]` (`{ start, end }` ISO instants; read them from an `.ics` file with `parseIcsBusy(text, { from, to, defaultZone })`) |
 | `specialHours` | `[]` (`{ label?, from, to, workStart, workEnd, quietBefore?, quietAfter? }`; `ramadanDates(year, preset?)` gives approximate Ramadan dates) |
+| `optional` | off (`true`: this zone never blocks a time; times it can attend rank higher) |
 | `prayer` | off |
 
 ## How scoring works

@@ -84,6 +84,8 @@ const repeated = (field: string) =>
                 ? ["Europe/London=2026-12-21..2026-12-31@10:00-16:00"]
                 : field === "ramadan"
                   ? ["Asia/Dhaka=09:00-15:30"]
+                  : field === "optional"
+                    ? ["America/New_York"]
                   : ["Asia/Dhaka=fri,sat"],
       description: "Repeat parameter for each IANA_ZONE=value override",
       param: { style: "form", explode: true },
@@ -134,6 +136,7 @@ export const slotsGetQuerySchema = resultQuerySchema.extend({
   holidayPreset: repeated("holidayPreset"),
   specialHours: repeated("specialHours"),
   ramadan: repeated("ramadan"),
+  optional: repeated("optional"),
   quiet: z.string().optional().openapi({ example: "08:00-21:00" }),
   prayerBuffer: numeric("prayerBuffer", 0, 180),
   prayerLocation: z.string().optional().openapi({ example: "Dhaka" }),
@@ -214,7 +217,9 @@ export const zoneSlotSchema = z.object({
   localEnd: z.string(),
   formattedStart: z.string(),
   formattedEnd: z.string(),
-  classification: z.enum(["ideal", "acceptable"]),
+  /** "blocked" only for optional zones, which never stop a slot. */
+  classification: z.enum(["ideal", "acceptable", "blocked"]),
+  optional: z.boolean().optional(),
 });
 export const slotSchema = z.object({
   start: z.string(),

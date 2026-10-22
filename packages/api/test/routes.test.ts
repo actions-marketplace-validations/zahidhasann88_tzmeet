@@ -904,3 +904,15 @@ describe("special hours and rotation over HTTP", () => {
     expect(error.details).toContainEqual(expect.objectContaining({ field }));
   });
 });
+
+describe('optional attendees over HTTP', () => {
+  it('accepts optional zones on GET and POST', async () => {
+    const query = 'zones=Europe/London,Asia/Dhaka,America/New_York&date=2026-11-02&days=1&step=60&top=50';
+    const required = slotsResultSchema.parse(await (await app.request(`/v1/slots?${query}`)).json());
+    const optional = slotsResultSchema.parse(await (await app.request(`/v1/slots?${query}&optional=America/New_York`)).json());
+    expect(optional.slots.length).toBeGreaterThan(required.slots.length);
+    expect(optional.slots.some(slot => slot.zones[2]!.classification === 'blocked' && slot.zones[2]!.optional)).toBe(true);
+    const posted = slotsResultSchema.parse(await (await post({ zones: [{ id: 'Europe/London' }, { id: 'America/New_York', optional: true }], startDate: '2026-11-02', days: 1 })).json());
+    expect(posted.slots[0]!.zones[1]!.optional).toBe(true);
+  });
+});

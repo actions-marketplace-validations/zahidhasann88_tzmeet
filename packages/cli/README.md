@@ -52,6 +52,7 @@ tzmeet zones london
 | `--busy` | Block busy times from a calendar export for one city, e.g. `Asia/Dhaka=me.ics`. Titles aren't read | |
 | `--special-hours` | Different work hours for a date range, e.g. `Europe/London=2026-12-21..2026-12-31@10:00-16:00` | |
 | `--ramadan` | Work hours during Ramadan for one city, e.g. `Asia/Dhaka=09:00-15:30`. Dates are calculated and approximate | |
+| `--optional` | Attendees in this city are optional: they never block a time, but times they can attend rank higher, e.g. `America/New_York` | |
 | `--rotation` | Also suggest `2` or `3` times to alternate weekly, so no city always gets the early or late slot | |
 | `--prayer-location` | Avoid prayer times for a city or `lat,long` | off |
 | `--prayer-method` | Prayer calculation method | Karachi |

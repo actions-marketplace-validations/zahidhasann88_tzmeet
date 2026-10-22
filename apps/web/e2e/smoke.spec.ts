@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile } from "node:fs/promises";
+import { decodeState } from "../src/state";
 
 async function open(page: import("@playwright/test").Page) {
   await page.goto("./");
@@ -48,6 +49,8 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   await page.getByLabel("Days to search").fill("3");
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
   await expect(page.locator(".slot-card").first()).toBeVisible();
+  // Slot searches run in a Web Worker, off the main thread.
+  expect(page.workers().length).toBeGreaterThan(0);
   await page
     .getByRole("button", { name: "Select slot 2", exact: true })
     .click();
@@ -56,7 +59,11 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   const share = await page.evaluate(
     () => document.documentElement.dataset.clipboard!,
   );
-  const original = JSON.parse(new URL(share).searchParams.get("state")!);
+  const original = decodeState(new URL(share).search)!;
+  // Compact share format: only settings that differ from the defaults.
+  expect(new URL(share).searchParams.has("s")).toBe(true);
+  const legacy = new URLSearchParams({ state: JSON.stringify(original) }).toString();
+  expect(new URL(share).search.length).toBeLessThan(legacy.length / 2);
   expect(original.input.zones.map((zone: { id: string }) => zone.id)).toEqual([
     "Asia/Dhaka",
     "Europe/London",
@@ -84,7 +91,7 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   await expect(restored.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect
     .poll(async () =>
-      JSON.parse(new URL(restored.url()).searchParams.get("state")!),
+      decodeState(new URL(restored.url()).search),
     )
     .toEqual(original);
   expect(errors).toEqual([]);
@@ -462,7 +469,7 @@ test("imports a busy calendar in the browser without sharing it", async ({
   const share = await page.evaluate(
     () => document.documentElement.dataset.clipboard!,
   );
-  const shared = JSON.parse(new URL(share).searchParams.get("state")!);
+  const shared = decodeState(new URL(share).search)!;
   expect(
     shared.input.zones.some((zone: Record<string, unknown>) => "busy" in zone),
   ).toBe(false);
@@ -520,10 +527,8 @@ test("suggests a fair rotation and stores Ramadan hours with the workspace", asy
   const share = await page.evaluate(
     () => document.documentElement.dataset.clipboard!,
   );
-  const tokyo = JSON.parse(
-    new URL(share).searchParams.get("state")!,
-  ).input.zones.find((zone: { id: string }) => zone.id === "Asia/Tokyo");
-  expect(tokyo.specialHours).toEqual([
+  const tokyo = decodeState(new URL(share).search)!.input.zones.find((zone: { id: string }) => zone.id === "Asia/Tokyo");
+  expect(tokyo!.specialHours).toEqual([
     {
       label: "Ramadan",
       from: "2026-02-18",

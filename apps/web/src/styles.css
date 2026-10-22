@@ -2388,3 +2388,4 @@ input[aria-invalid="true"] {
 .rotation-time .badge {
   justify-self: start;
 }
+.badge-optional { background: transparent; border-color: var(--line); color: var(--muted); }
