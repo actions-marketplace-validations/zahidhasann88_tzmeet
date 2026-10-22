@@ -1,5 +1,24 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`cron subcommand > prints a run table in the default zones with DST notes and warnings 1`] = `
+"30 2 * * *  (Unix cron, runs in America/New_York)
+At 02:30
+
+# | America/New_York (schedule)  | Asia/Dhaka                   | UTC                          | Europe/London                | Note
+--+------------------------------+------------------------------+------------------------------+------------------------------+-----------------------------------------------------------------
+1 | Fri 12 Mar 2027 02:30 -05:00 | Fri 12 Mar 2027 13:30 +06:00 | Fri 12 Mar 2027 07:30 +00:00 | Fri 12 Mar 2027 07:30 +00:00 |
+2 | Sat 13 Mar 2027 02:30 -05:00 | Sat 13 Mar 2027 13:30 +06:00 | Sat 13 Mar 2027 07:30 +00:00 | Sat 13 Mar 2027 07:30 +00:00 |
+3 | Sun 14 Mar 2027 03:00 -04:00 | Sun 14 Mar 2027 13:00 +06:00 | Sun 14 Mar 2027 07:00 +00:00 | Sun 14 Mar 2027 07:00 +00:00 | late: DST skipped this time, cron runs it right after the change
+4 | Mon 15 Mar 2027 02:30 -04:00 | Mon 15 Mar 2027 12:30 +06:00 | Mon 15 Mar 2027 06:30 +00:00 | Mon 15 Mar 2027 06:30 +00:00 |
+
+Warnings:
+  ! On 2027-03-14 in America/New_York, clocks jump from 02:00 to 03:00. Unix cron runs the 02:30 job right after the change, at 03:00.
+  i On Asia/Dhaka clocks, runs move 1 hour earlier from 2027-03-14, then 1 hour later from 2027-11-07.
+  i On UTC clocks, runs move 1 hour earlier from 2027-03-14, then 1 hour later from 2027-11-07.
+  i On Europe/London clocks, runs move 1 hour earlier from 2027-03-14, then 1 hour later from 2027-03-28, then 1 hour earlier from 2027-10-31, then 1 hour later from 2027-11-07.
+"
+`;
+
 exports[`fixed CLI output > snapshots JSON with the same ranked, top-capped data 1`] = `
 {
   "diagnostics": {

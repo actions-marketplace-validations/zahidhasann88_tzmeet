@@ -441,8 +441,7 @@ describe("zones and warnings", () => {
       displayZones: [NY, "Asia/Dhaka"],
     }).warnings.filter((warning) => warning.code === "zone-shift");
     expect(shifts.map((warning) => warning.message)).toEqual([
-      "From 2026-11-01, runs happen 1 hour earlier on America/New_York clocks.",
-      "From 2027-03-14, runs happen 1 hour later on America/New_York clocks.",
+      "On America/New_York clocks, runs move 1 hour earlier from 2026-11-01, then 1 hour later from 2027-03-14.",
     ]);
   });
 

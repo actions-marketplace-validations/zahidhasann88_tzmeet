@@ -1,7 +1,6 @@
 import { z } from '@hono/zod-openapi';
-import { conversionSchema, findSlotsSchema } from '@tzmeet/core';
+import { conversionSchema, cronDialects, findSlotsSchema } from '@tzmeet/core';
 
-/** API resource bounds, separate from the library's more generous limits. */
 export const API_LIMITS = { zones: 8, days: 14, minStep: 5, minDuration: 5, maxDuration: 480, top: 50, bodyBytes: 32768 } as const;
 export const apiInputSchema = findSlotsSchema.extend({
   zones: z.preprocess((value, ctx) => {
@@ -66,3 +65,22 @@ export const diagnosticsSchema = z.object({
 });
 export const slotsResultSchema = z.object({ slots: z.array(slotSchema), diagnostics: diagnosticsSchema, meta: z.object({ count: z.number().int(), generatedAt: z.string(), version: z.string() }) }).openapi('SlotsResponse');
 export const healthSchema = z.object({ status: z.literal('ok'), version: z.string() });
+
+const count = z.string().regex(/^\d+$/, 'count must be an integer from 1 to 50')
+  .transform(Number).pipe(z.number().int().min(1, 'count must be at least 1').max(50, 'count must be at most 50')).default('10').openapi({ description: 'Number of runs to list (1–50)', example: '3' });
+export const cronQuerySchema = z.object({
+  expression: z.string().min(1, 'expression is required').max(200, 'expression must be at most 200 characters').openapi({ example: '30 2 * * *', description: 'Cron expression; detected as Unix, Kubernetes, Spring or Quartz unless dialect is set' }),
+  dialect: z.enum(cronDialects as ['unix', 'kubernetes', 'spring', 'quartz']).optional().openapi({ example: 'unix' }),
+  zone: z.string().optional().openapi({ example: 'America/New_York', description: 'Zone the schedule runs in (default: UTC)' }),
+  from: z.string().optional().openapi({ example: '2027-03-12T00:00:00Z', description: 'List runs after this ISO instant (default: now)' }),
+  count,
+  display: z.string().optional().refine(value => value === undefined || value.split(',').length <= API_LIMITS.zones, 'display must contain at most 8 zones').openapi({ example: 'Asia/Dhaka,UTC', description: 'At most eight comma-separated zones to show each run in' })
+}).strict();
+const cronZoneSchema = z.object({ zone: z.string(), local: z.string(), offsetMinutes: z.number() });
+export const cronResultSchema = z.object({
+  dialect: z.enum(cronDialects as ['unix', 'kubernetes', 'spring', 'quartz']), dialectName: z.string(), expression: z.string(), zone: z.string(), description: z.string(),
+  fields: z.array(z.object({ name: z.string(), text: z.string() })),
+  runs: z.array(z.object({ utc: z.string(), local: z.string(), scheduled: z.string(), note: z.enum(['gap-catch-up', 'fold-once', 'fold-first', 'fold-second', 'fold-maybe-twice']).optional(), zones: z.array(cronZoneSchema) })),
+  skipped: z.array(z.object({ scheduled: z.string(), reason: z.literal('gap') })),
+  warnings: z.array(z.object({ code: z.string(), severity: z.enum(['warning', 'info']), message: z.string(), at: z.string().optional() }))
+}).openapi('CronExplanation');

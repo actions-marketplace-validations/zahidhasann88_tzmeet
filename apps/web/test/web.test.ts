@@ -3,6 +3,7 @@ import { classifySpan, classifySpans, findSlots, type Slot } from '@tzmeet/core'
 import { calendarText, foldLine, inviteText } from '../src/invite';
 import { decodeState, defaultState, encodeState, initials, parseState, persistState, regionalZone, restoreState, STORAGE_KEY } from '../src/state';
 import { makeTimeline } from '../src/timeline';
+import { cronHash, defaultCronState, fieldLabels, isCronRoute, parseCronHash } from '../src/cron-state';
 
 function fixture(): Slot {
   const open = { workStart: '00:00', workEnd: '23:59', quietBefore: '00:00', quietAfter: '23:59', weekend: [] };
@@ -137,5 +138,26 @@ describe('shared full-span timeline evaluation', () => {
     expect(rows[0]!.segments.some(segment => segment.kind === 'prayer')).toBe(true);
     expect(rows[2]!.segments.some(segment => segment.kind === 'weekend')).toBe(true); // NY is still Sunday at 00:00 UTC.
     expect(rows[0]!.origin).toContain('06:00');
+  });
+});
+
+describe('cron page state', () => {
+  it('round-trips through the URL hash', () => {
+    const state = { expression: '0 0 9 ? * MON-FRI', dialect: 'quartz' as const, zone: 'Asia/Dhaka', display: ['UTC', 'Europe/London'], count: 20 };
+    const hash = cronHash(state);
+    expect(isCronRoute(hash)).toBe(true);
+    expect(parseCronHash(hash)).toEqual(state);
+  });
+
+  it('falls back to defaults for missing or invalid values', () => {
+    expect(parseCronHash('#/cron')).toEqual(defaultCronState());
+    expect(parseCronHash('#/cron?d=cronie&z=Mars/Base&n=7&show=UTC,Nope,UTC')).toEqual({ ...defaultCronState(), display: ['UTC'] });
+    expect(parseCronHash('#results')).toEqual(defaultCronState());
+    expect(isCronRoute('#/cronjobs')).toBe(false);
+  });
+
+  it('labels fields by expression length', () => {
+    expect(fieldLabels(5)[4]).toBe('day of week');
+    expect(fieldLabels(7)).toHaveLength(7);
   });
 });

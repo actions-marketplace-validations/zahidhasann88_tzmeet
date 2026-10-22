@@ -367,3 +367,43 @@ describe('built Node executable', () => {
     expect(JSON.parse(output.stdout).slots).toEqual([]);
   });
 });
+
+describe('cron subcommand', () => {
+  const from = ['--from', '2027-03-12T00:00:00Z'];
+
+  it('prints a run table in the default zones with DST notes and warnings', () => {
+    const output = invoke(['cron', '30 2 * * *', '--zone', 'America/New_York', '--count', '4', ...from]);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toMatchSnapshot();
+    expect(output.stdout).toContain('Sun 14 Mar 2027 03:00 -04:00');
+    expect(output.stdout).toContain('late: DST skipped this time');
+    expect(output.stdout).toContain('! On 2027-03-14 in America/New_York, clocks jump from 02:00 to 03:00.');
+  });
+
+  it('joins unquoted fields and honours --dialect and --display', () => {
+    const output = invoke(['cron', '30', '1', '*', '*', '*', '--dialect', 'kubernetes', '--zone', 'America/New_York', '--display', 'UTC', '--count', '2', '--from', '2026-10-31T12:00:00Z']);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toContain('30 1 * * *  (Kubernetes CronJob, runs in America/New_York)');
+    expect(output.stdout).toContain('2nd of 2 runs');
+    expect(output.stdout).not.toContain('Asia/Dhaka');
+  });
+
+  it('prints core output as JSON and defaults --from to now', () => {
+    const output = invoke(['cron', '@daily', '--count', '1', '--json']);
+    expect(output.code, output.stderr).toBe(0);
+    const result = JSON.parse(output.stdout);
+    expect(result.runs[0].utc).toBe('2026-11-02T00:00:00.000Z');
+    expect(result.runs[0].zones.map((zone: { zone: string }) => zone.zone)).toEqual(['Asia/Dhaka', 'UTC', 'America/New_York', 'Europe/London']);
+  });
+
+  it.each([
+    [['cron', '0 99 * * *'], 'hour must be 0–23, got 99'],
+    [['cron', '0 0 * * *', '--count', 'x'], '--count must be an integer'],
+    [['cron', '0 0 * * *', '--dialect', 'cronie'], 'dialect'],
+    [['cron', '0 0 * * *', '--zone', 'Asia/Dhka'], 'Unknown IANA time zone']
+  ])('exits 1 for %j', (args, message) => {
+    const output = invoke(args);
+    expect(output.code).toBe(1);
+    expect(output.stderr).toContain(message);
+  });
+});

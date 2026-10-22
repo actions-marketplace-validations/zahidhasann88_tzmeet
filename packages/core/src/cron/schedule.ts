@@ -34,8 +34,13 @@ function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
 export const cronExplainSchema = z
   .object({
     expression: z.string().min(1, "Enter a cron expression").max(200),
-    dialect: z.enum(cronDialects as [CronDialect, ...CronDialect[]]).optional(),
-    /** Zone the schedule runs in (crontab CRON_TZ, spec.timeZone, @Scheduled zone, trigger zone). */
+    dialect: z
+      .enum(cronDialects as [CronDialect, ...CronDialect[]], {
+        errorMap: () => ({
+          message: "dialect must be unix, kubernetes, spring or quartz",
+        }),
+      })
+      .optional(),
     zone: timeZoneIdSchema.optional(),
     from: z
       .string()
@@ -434,6 +439,7 @@ export function explainCron(input: CronExplainInput): CronExplanation {
           ].map((change) => change.at),
         ),
       ].sort((a, b) => a - b);
+      const shifts: { at: number; text: string }[] = [];
       for (const at of instants) {
         const delta = difference(at) - difference(at - 1);
         if (!delta) continue;
@@ -442,13 +448,18 @@ export function explainCron(input: CronExplainInput): CronExplanation {
           minutes % 60
             ? `${minutes} minutes`
             : `${minutes / 60} hour${minutes === 60 ? "" : "s"}`;
+        shifts.push({
+          at,
+          text: `${amount} ${delta > 0 ? "later" : "earlier"} from ${DateTime.fromMillis(at, { zone: id }).toISODate()}`,
+        });
+      }
+      if (shifts.length)
         warnings.push({
           code: "zone-shift",
           severity: "info",
-          at: DateTime.fromMillis(at, { zone: "UTC" }).toISO()!,
-          message: `From ${DateTime.fromMillis(at, { zone: id }).toISODate()}, runs happen ${amount} ${delta > 0 ? "later" : "earlier"} on ${id} clocks.`,
+          at: DateTime.fromMillis(shifts[0]!.at, { zone: "UTC" }).toISO()!,
+          message: `On ${id} clocks, runs move ${shifts.map((shift) => shift.text).join(", then ")}.`,
         });
-      }
     }
   }
 

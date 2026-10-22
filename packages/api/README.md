@@ -22,6 +22,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `POST /v1/slots` | Same, with a JSON body for per-city settings |
 | `GET /v1/zones?search=dhaka` | Search time zone names |
 | `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a time |
+| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring or Quartz): next runs and DST warnings |
 | `GET /v1/health` | Health check |
 | `GET /docs` | Interactive docs |
 
