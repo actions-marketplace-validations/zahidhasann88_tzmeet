@@ -383,3 +383,16 @@ test('checks a slot over the coming weeks of DST changes', async ({ page }) => {
   await toggle.click();
   await expect(panel).toHaveCount(0);
 });
+
+test('applies a public holiday preset and lists upcoming holidays', async ({ page }) => {
+  await open(page);
+  await page.getByRole('button', { name: 'Settings for Dhaka', exact: true }).click();
+  await expect(page.getByLabel('Dhaka public holidays')).toContainText('Bangladesh (suggested)');
+  await page.getByLabel('Dhaka public holidays').selectOption('BD');
+  await expect(page.locator('.zone-details')).toContainText('Next: 16 Dec Victory Day · 25 Dec Christmas Day');
+  await page.getByLabel('Starting date', { exact: true }).fill('2026-12-16');
+  await page.getByLabel('Days to search').fill('1');
+  await expect(page.locator('.empty-results')).toContainText('holiday in Dhaka');
+  await page.getByLabel('Dhaka public holidays').selectOption('');
+  await expect(page.locator('.slot-card').first()).toBeVisible();
+});

@@ -48,6 +48,7 @@ if (result.slots.length === 0) {
 | `quietBefore` / `quietAfter` (acceptable hours) | 08:00 / 21:00 |
 | `weekend` (ISO days, 1 = Mon) | `[6, 7]`, or `[5, 6]` in Fri/Sat countries |
 | `holidays` | `[]` (dates as YYYY-MM-DD) |
+| `holidayPreset` | off (`BD`, `GB-ENG` or `US`; see `presetHolidays(preset, year)`) |
 | `prayer` | off |
 
 ## How scoring works

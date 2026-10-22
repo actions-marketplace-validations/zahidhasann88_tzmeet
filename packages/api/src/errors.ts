@@ -29,7 +29,7 @@ export class ApiError extends Error {
 }
 const fieldName = (path: string) => {
   const aliases: Record<string, string> = {
-    "zone-work": "zoneWork",
+    "zone-work": "zoneWork", "holiday-preset": "holidayPreset",
     "prayer-buffer": "prayerBuffer",
     "prayer-location": "prayerLocation",
     "prayer-method": "prayerMethod",

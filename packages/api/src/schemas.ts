@@ -19,7 +19,7 @@ const numeric = (field: string, min?: number, max?: number) => z.string().regex(
   if (min !== undefined && number < min) ctx.addIssue({ code: 'custom', message: `${field} must be at least ${min}` });
   if (max !== undefined && number > max) ctx.addIssue({ code: 'custom', message: `${field} must be at most ${max}` });
 }).optional().openapi({ example: field === 'duration' ? '30' : field === 'days' ? '1' : field === 'step' ? '15' : '10' });
-const repeated = (field: string) => z.union([z.string(), z.array(z.string())]).optional().openapi({ example: field === 'zoneWork' ? ['Asia/Dhaka=10:00-17:00'] : field === 'holiday' ? ['Asia/Dhaka=2026-12-16'] : ['Asia/Dhaka=fri,sat'], description: 'Repeat parameter for each IANA_ZONE=value override', param: { style: 'form', explode: true } });
+const repeated = (field: string) => z.union([z.string(), z.array(z.string())]).optional().openapi({ example: field === 'zoneWork' ? ['Asia/Dhaka=10:00-17:00'] : field === 'holiday' ? ['Asia/Dhaka=2026-12-16'] : field === 'holidayPreset' ? ['Asia/Dhaka=BD'] : ['Asia/Dhaka=fri,sat'], description: 'Repeat parameter for each IANA_ZONE=value override', param: { style: 'form', explode: true } });
 const top = z.string().regex(/^\d+$/, 'top must be an integer from 1 to 50')
   .transform(Number).pipe(z.number().int().min(1, 'top must be at least 1').max(50, 'top must be at most 50')).default('10').openapi({ description: 'Number of returned slots (1–50)', example: '2' });
 export const resultQuerySchema = z.object({ top, format: z.enum(['json', 'text', 'ics']).default('json').openapi({ example: 'json' }) }).strict();
@@ -27,7 +27,7 @@ export const slotsGetQuerySchema = resultQuerySchema.extend({
   zones: z.string().min(1, 'zones is required as comma-separated IANA identifiers').refine(value => value.split(',').length <= 8, 'zones must contain at most 8 participants').openapi({ example: 'Asia/Dhaka,Europe/London' }),
   date: findSlotsSchema.shape.startDate.openapi({ example: '2026-11-02' }),
   duration: numeric('duration', 5, 480), days: numeric('days', 1, 14), step: numeric('step', 5, 1440),
-  work: z.string().optional().openapi({ example: '09:00-18:00' }), zoneWork: repeated('zoneWork'), weekend: repeated('weekend'), holiday: repeated('holiday'), quiet: z.string().optional().openapi({ example: '08:00-21:00' }),
+  work: z.string().optional().openapi({ example: '09:00-18:00' }), zoneWork: repeated('zoneWork'), weekend: repeated('weekend'), holiday: repeated('holiday'), holidayPreset: repeated('holidayPreset'), quiet: z.string().optional().openapi({ example: '08:00-21:00' }),
   prayerBuffer: numeric('prayerBuffer', 0, 180), prayerLocation: z.string().optional().openapi({ example: 'Dhaka' }), prayerMethod: z.string().optional().openapi({ example: 'Karachi' })
 });
 export const zonesQuerySchema = z.object({ search: z.string().max(100).default('').openapi({ example: 'dhaka' }) }).strict();

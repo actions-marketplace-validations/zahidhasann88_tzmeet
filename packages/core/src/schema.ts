@@ -1,5 +1,6 @@
 import { DateTime, IANAZone } from "luxon";
 import { z } from "zod";
+import { holidayPresetIds } from "./holidays.js";
 
 export const cities = {
   Dhaka: { lat: 23.8103, lng: 90.4125 },
@@ -98,6 +99,8 @@ const zoneObject = z
     quietBefore: timeSchema.default("08:00"),
     quietAfter: timeSchema.default("21:00"),
     holidays: z.array(dateSchema).max(366).optional(),
+  /** Public holidays calculated for this zone's country, merged with `holidays`. */
+  holidayPreset: z.enum(holidayPresetIds).optional(),
     prayer: prayerSchema.optional(),
   })
   .strict();

@@ -68,6 +68,8 @@ export type {
 } from "./cron/parse.js";
 export { describeCron } from "./cron/describe.js";
 export { recurringImpact, recurringSchema } from "./recurring.js";
+export { holidayPresets, holidayPresetIds, presetHolidays, suggestHolidayPreset } from "./holidays.js";
+export type { Holiday, HolidayPreset } from "./holidays.js";
 export type {
   RecurringImpact,
   RecurringInput,

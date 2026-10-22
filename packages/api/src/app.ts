@@ -401,6 +401,7 @@ export function createApp(options: AppOptions = {}) {
       zoneWork: array(query.zoneWork),
       weekend: array(query.weekend),
       holiday: array(query.holiday),
+      holidayPreset: array(query.holidayPreset),
     });
     const result = slots(input, query.top);
     const at = now().getTime();
@@ -465,6 +466,7 @@ export function createApp(options: AppOptions = {}) {
       zoneWork: array(query.zoneWork),
       weekend: array(query.weekend),
       holiday: array(query.holiday),
+      holidayPreset: array(query.holidayPreset),
     });
     if (!options.apiKeys?.length) c.header("Cache-Control", "public, max-age=300");
     return c.json(

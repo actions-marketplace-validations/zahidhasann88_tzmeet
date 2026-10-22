@@ -80,6 +80,11 @@ export function runCLI(
       collect,
     )
     .option(
+      "--holiday-preset <IANA_ZONE=preset>",
+      "per-zone public holidays: BD, GB-ENG, US or none, e.g. Asia/Dhaka=BD; repeatable",
+      collect,
+    )
+    .option(
       "--quiet <HH:mm-HH:mm>",
       "override allowed hours in every zone (default: 08:00-21:00)",
     )
@@ -111,6 +116,7 @@ Examples:
   tzmeet --zones Asia/Dhaka,America/New_York,Europe/London --date 2026-11-02 --duration 30
   tzmeet --zones Asia/Dhaka,Europe/London --weekend Asia/Dhaka=fri,sat --json
   tzmeet --config team.json --zone-work America/New_York=08:00-17:00
+  tzmeet --zones Asia/Dhaka,Europe/London --holiday-preset Asia/Dhaka=BD --holiday-preset Europe/London=GB-ENG
   tzmeet zones london
   tzmeet cron "30 2 * * *" --zone America/New_York
   tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
@@ -223,7 +229,7 @@ Quote the expression so the shell doesn't expand *:
       "after",
       `
 The meeting repeats every week on the weekday of --date, at --time in the first zone.
-Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holiday,
+Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holiday, --holiday-preset,
 --quiet, --prayer-*, --config) work the same as for the main search.
   tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
   tzmeet recurring --zones America/New_York,Asia/Dhaka --time 09:00 --weeks 52 --json

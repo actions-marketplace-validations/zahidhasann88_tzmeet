@@ -48,6 +48,7 @@ tzmeet zones london
 | `--quiet` | Earliest and latest acceptable time | 08:00-21:00 |
 | `--weekend` | Weekend for one city, e.g. `Europe/London=sat,sun` or `=none` | Sat/Sun (Fri/Sat in Fri/Sat countries) |
 | `--holiday` | Days off for one city, e.g. `Asia/Dhaka=2026-12-16` | |
+| `--holiday-preset` | Public holidays for one city: `BD`, `GB-ENG` (England and Wales) or `US`, e.g. `Asia/Dhaka=BD`. Islamic dates are approximate | |
 | `--prayer-location` | Avoid prayer times for a city or `lat,long` | off |
 | `--prayer-method` | Prayer calculation method | Karachi |
 | `--prayer-buffer` | Minutes to keep free around prayer | 10 |

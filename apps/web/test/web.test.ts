@@ -161,3 +161,12 @@ describe('cron page state', () => {
     expect(fieldLabels(7)).toHaveLength(7);
   });
 });
+
+describe('holiday presets in shared state', () => {
+  it('round-trips a zone holiday preset through the URL', () => {
+    const state = defaultState();
+    state.input.startDate = '2026-11-02';
+    state.input.zones[0]!.holidayPreset = 'BD';
+    expect(decodeState(`?${encodeState(state)}`)!.input.zones[0]!.holidayPreset).toBe('BD');
+  });
+});

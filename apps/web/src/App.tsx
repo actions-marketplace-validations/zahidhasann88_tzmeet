@@ -15,6 +15,7 @@ import {
   type NormalizedInput,
   type Slot,
 } from "@tzmeet/core";
+import { holidayPresetIds, holidayPresets, presetHolidays, suggestHolidayPreset, type HolidayPreset } from "@tzmeet/core";
 import Icon from "./Icon";
 import {
   decodeState,
@@ -519,6 +520,11 @@ function ZoneSettings({
                     zone={zone}
                     onChange={(holidays) => change(index, { holidays })}
                   />
+                  <HolidayPresetField
+                    zone={zone}
+                    from={state.input.startDate}
+                    onChange={(holidayPreset) => change(index, { holidayPreset })}
+                  />
                   <p className="detail-hint">
                     Work must fit within allowed hours. For night shifts, set a
                     start later than the end (e.g. 22:00–06:00).
@@ -609,13 +615,56 @@ function HolidayField({
         value={draft}
         onChange={(event) => {
           setDraft(event.target.value);
-          const dates = event.target.value.split(/[s,]+/).filter(Boolean);
+          const dates = event.target.value.split(/[\s,]+/).filter(Boolean);
           onChange(dates.length ? dates : undefined);
         }}
       />
       <span className="detail-hint">
         Local dates (YYYY-MM-DD) treated like weekend days.
       </span>
+    </label>
+  );
+}
+
+/** Country public holidays, with the next few shown so people can check them. */
+function HolidayPresetField({
+  zone,
+  from,
+  onChange,
+}: {
+  zone: NormalizedInput["zones"][number];
+  from: string;
+  onChange: (preset: HolidayPreset | undefined) => void;
+}) {
+  const suggested = suggestHolidayPreset(zone.id);
+  const upcoming = useMemo(() => {
+    if (!zone.holidayPreset || !/^\d{4}-\d{2}-\d{2}$/.test(from)) return [];
+    const year = Number(from.slice(0, 4));
+    return [...presetHolidays(zone.holidayPreset, year), ...presetHolidays(zone.holidayPreset, year + 1)]
+      .filter((holiday) => holiday.date >= from)
+      .slice(0, 3);
+  }, [zone.holidayPreset, from]);
+  return (
+    <label>
+      Public holidays
+      <select
+        aria-label={`${zone.label} public holidays`}
+        value={zone.holidayPreset ?? ""}
+        onChange={(event) => onChange((event.target.value || undefined) as HolidayPreset | undefined)}
+      >
+        <option value="">None</option>
+        {holidayPresetIds.map((id) => (
+          <option key={id} value={id}>
+            {holidayPresets[id]}
+            {id === suggested ? " (suggested)" : ""}
+          </option>
+        ))}
+      </select>
+      {upcoming.length > 0 && (
+        <span className="detail-hint">
+          Next: {upcoming.map((holiday) => `${DateTime.fromISO(holiday.date).setLocale("en").toFormat("d LLL")} ${holiday.name}${holiday.approximate ? " (approx.)" : ""}`).join(" · ")}
+        </span>
+      )}
     </label>
   );
 }

@@ -446,3 +446,22 @@ describe('recurring subcommand', () => {
     expect(output.stderr).toContain(message);
   });
 });
+
+describe('holiday presets', () => {
+  it('blocks preset holidays from --holiday-preset and config', () => {
+    const args = ['--zones', 'Asia/Dhaka,Europe/London', '--date', '2026-12-16', '--days', '1'];
+    expect(json(args).slots.length).toBeGreaterThan(0);
+    const blocked = json([...args, '--holiday-preset', 'Asia/Dhaka=BD']);
+    expect(blocked.slots).toEqual([]);
+    expect(blocked.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
+    configFile({ zones: [{ id: 'Asia/Dhaka', holidayPreset: 'BD' }, { id: 'Europe/London' }] });
+    expect(json(['--date', '2026-12-16', '--days', '1']).slots).toEqual([]);
+    expect(json(['--date', '2026-12-16', '--days', '1', '--holiday-preset', 'Asia/Dhaka=none']).slots.length).toBeGreaterThan(0);
+  });
+
+  it('rejects unknown presets', () => {
+    const output = invoke(['--zones', 'UTC', '--date', '2026-12-16', '--holiday-preset', 'UTC=FR']);
+    expect(output.code).toBe(1);
+    expect(output.stderr).toContain('Unknown holiday preset "FR"; use BD, GB-ENG, US or none');
+  });
+});

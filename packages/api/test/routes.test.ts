@@ -685,3 +685,26 @@ describe('recurring meetings over HTTP', () => {
     expect(error.details).toContainEqual(expect.objectContaining({ field }));
   });
 });
+
+describe('holiday presets over HTTP', () => {
+  it('applies repeated holidayPreset parameters on GET and per-zone presets on POST', async () => {
+    const base = 'zones=Asia/Dhaka,Europe/London&date=2026-12-16&days=1';
+    const open = slotsResultSchema.parse(await (await app.request(`/v1/slots?${base}`)).json());
+    expect(open.slots.length).toBeGreaterThan(0);
+    const blocked = slotsResultSchema.parse(await (await app.request(`/v1/slots?${base}&holidayPreset=Asia/Dhaka=BD`)).json());
+    expect(blocked.slots).toEqual([]);
+    expect(blocked.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
+    const posted = slotsResultSchema.parse(await (await post({ zones: [{ id: 'Asia/Dhaka', holidayPreset: 'BD' }, { id: 'Europe/London' }], startDate: '2026-12-16', days: 1 })).json());
+    expect(posted.slots).toEqual([]);
+  });
+
+  it('applies presets to recurring meetings', async () => {
+    const body = recurringResultSchema.parse(await (await app.request('/v1/recurring?zones=Europe/London,Asia/Dhaka&date=2026-12-09&time=10:00&weeks=2&holidayPreset=Asia/Dhaka=BD')).json());
+    expect(body.periods.map(period => period.zones[1]!.classification)).toEqual(['ideal', 'blocked']);
+  });
+
+  it('rejects unknown presets with the parameter name', async () => {
+    const error = await publicError(await app.request('/v1/slots?zones=UTC&date=2026-12-16&holidayPreset=UTC=FR'));
+    expect(error.details).toEqual([{ field: 'holidayPreset', message: 'Unknown holiday preset "FR"; use BD, GB-ENG, US or none' }]);
+  });
+});
