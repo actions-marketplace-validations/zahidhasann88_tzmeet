@@ -75,7 +75,8 @@ You can change all of these for each city.
 ## Good to know
 
 - Prayer times are calculated and approximate. Check your local mosque timetable.
-- Public holidays can be switched on per city for Bangladesh, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date. tzmeet doesn't read your calendar.
+- Public holidays can be switched on per city for Bangladesh, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date.
+- You can import a calendar export (`.ics`) per city to block busy times. In the web app it's read in your browser only and never saved or shared; event titles are ignored. tzmeet never connects to your calendar account.
 
 ## For developers
 

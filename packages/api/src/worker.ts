@@ -19,7 +19,6 @@ export default {
         });
       } catch {
         // Fail closed through the regular JSON/security/logging middleware rather
-        // than exposing configuration exceptions from the adapter.
         app = createApp({
           now: () => {
             throw new Error("Invalid Worker configuration");

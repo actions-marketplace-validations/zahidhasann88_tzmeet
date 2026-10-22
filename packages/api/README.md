@@ -29,7 +29,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 
 `/v1/slots` options: `top` (1–50, default 10) and `format` (`json`, `text` or `ics`).
 
-`/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone).
+`/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone). POST zones also accept `busy: [{ start, end }]` intervals (ISO instants) to block calendar busy times.
 
 ## Examples
 

@@ -58,6 +58,13 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput["prayer"]) {
   const dailyBoundaries = new Map<string, number[]>();
   const prayerDates = new Map<string, ReturnType<typeof getPrayerWindows>>();
   const rule = zone.prayer ?? globalPrayer;
+  // Calendar busy times, sorted by start. Touching a busy interval is allowed.
+  const busy = (zone.busy ?? [])
+    .map(
+      (interval) =>
+        [Date.parse(interval.start), Date.parse(interval.end)] as const,
+    )
+    .sort((x, y) => x[0] - y[0]);
   const workStart = toMinutes(zone.workStart);
   const workEnd = toMinutes(zone.workEnd);
   const quietBefore = toMinutes(zone.quietBefore);
@@ -165,6 +172,13 @@ function evaluator(zone: NormalZone, globalPrayer?: NormalizedInput["prayer"]) {
         }
       }
     }
+    for (const [left, right] of busy) {
+      if (left >= b) break;
+      if (right > a) {
+        constraints.add("busy");
+        break;
+      }
+    }
     const sorted = [...new Set(points)].sort((x, y) => x - y);
     const samples = [...sorted];
     for (let i = 1; i < sorted.length; i++)
@@ -206,7 +220,6 @@ export function classifySpan(
   return classifySpans(zone, [{ start: startISO, end: endISO }], prayer)[0]!;
 }
 
-/** Classify many spans with one search-local cache, for fast minute-resolution timelines. */
 export function classifySpans(
   zone: ZoneRule,
   spans: readonly { start: string; end: string }[],
@@ -298,7 +311,9 @@ function diagnostics(
         ? "Try a different week or change weekend days only where the team agrees."
         : most.constraint === "holiday"
           ? `A holiday in ${most.label} blocks part of this range. Try a different week, or remove that date if people are working.`
-          : `Reduce the prayer buffer for ${most.label} if appropriate, or try another time/date.`;
+          : most.constraint === "busy"
+            ? `${most.label}'s calendar is busy for much of this range. Try another week, a shorter meeting, or ask whether a busy event can move.`
+            : `Reduce the prayer buffer for ${most.label} if appropriate, or try another time/date.`;
   const dominant = most
     ? `The largest rejection count was ${most.constraint} in ${most.label} (${most.count} of ${scanned} candidates).`
     : "No full meeting fits inside the requested date range.";

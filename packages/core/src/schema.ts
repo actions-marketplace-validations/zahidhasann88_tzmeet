@@ -42,7 +42,6 @@ const dateSchema = z
     "Date is not a valid calendar date",
   );
 
-/** Shared schema for an optional location-specific prayer rule. */
 export const prayerSchema = z
   .object({
     location: z.union([
@@ -87,6 +86,21 @@ export function defaultWeekend(id: string): number[] {
   return fridaySaturdayZones.has(id) ? [5, 6] : [6, 7];
 }
 
+const instantSchema = z
+  .string()
+  .refine(
+    (value) =>
+      /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && DateTime.fromISO(value).isValid,
+    "Must be an ISO instant with Z or an explicit offset",
+  );
+export const busyIntervalSchema = z
+  .object({ start: instantSchema, end: instantSchema })
+  .strict()
+  .refine((interval) => Date.parse(interval.end) > Date.parse(interval.start), {
+    message: "end must be after start",
+    path: ["end"],
+  });
+
 const zoneObject = z
   .object({
     id: z
@@ -99,8 +113,8 @@ const zoneObject = z
     quietBefore: timeSchema.default("08:00"),
     quietAfter: timeSchema.default("21:00"),
     holidays: z.array(dateSchema).max(366).optional(),
-  /** Public holidays calculated for this zone's country, merged with `holidays`. */
-  holidayPreset: z.enum(holidayPresetIds).optional(),
+    holidayPreset: z.enum(holidayPresetIds).optional(),
+    busy: z.array(busyIntervalSchema).max(5000).optional(),
     prayer: prayerSchema.optional(),
   })
   .strict();

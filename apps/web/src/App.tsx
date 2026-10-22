@@ -15,7 +15,13 @@ import {
   type NormalizedInput,
   type Slot,
 } from "@tzmeet/core";
-import { holidayPresetIds, holidayPresets, presetHolidays, suggestHolidayPreset, type HolidayPreset } from "@tzmeet/core";
+import {
+  holidayPresetIds,
+  holidayPresets,
+  presetHolidays,
+  suggestHolidayPreset,
+  type HolidayPreset,
+} from "@tzmeet/core";
 import Icon from "./Icon";
 import {
   decodeState,
@@ -31,6 +37,13 @@ import { downloadCalendar, inviteText } from "./invite";
 import { makeTimeline } from "./timeline";
 import CronPage from "./Cron";
 import RecurringPanel from "./Recurring";
+import {
+  MAX_CALENDAR_BYTES,
+  readCalendars,
+  withBusy,
+  type CalendarResult,
+  type ImportedCalendar,
+} from "./calendars";
 import { CRON_ROUTE, isCronRoute } from "./cron-state";
 
 type StateSetter = Dispatch<SetStateAction<WebState | null>>;
@@ -49,6 +62,19 @@ export default function App() {
   const [state, setState] = useState<WebState | null>(null);
   const [notice, setNotice] = useState("");
   const [copyFallback, setCopyFallback] = useState("");
+  // Imported calendars stay in memory: never in the URL, storage or share links.
+  const [calendars, setCalendars] = useState<Record<string, ImportedCalendar>>(
+    {},
+  );
+  const input = state?.input;
+  const calendarResults = useMemo(
+    () => (input ? readCalendars(calendars, input) : {}),
+    [calendars, input],
+  );
+  const searchInput = useMemo(
+    () => (input ? withBusy(input, calendarResults) : null),
+    [input, calendarResults],
+  );
   const [cronView, setCronView] = useState(() =>
     isCronRoute(window.location.hash),
   );
@@ -99,7 +125,7 @@ export default function App() {
       );
     }
   }
-  if (!state)
+  if (!state || !searchInput)
     return (
       <main className="loading">
         <span className="logo-mark">
@@ -216,7 +242,21 @@ export default function App() {
             </section>
             <div className="workspace">
               <aside className="settings" aria-label="Meeting settings">
-                <ZoneSettings state={state} setState={setState} />
+                <ZoneSettings
+                  state={state}
+                  setState={setState}
+                  calendars={calendars}
+                  calendarResults={calendarResults}
+                  onCalendar={(id, calendar) =>
+                    setCalendars((current) => {
+                      const next = { ...current };
+                      if (calendar) next[id] = calendar;
+                      else delete next[id];
+                      return next;
+                    })
+                  }
+                  notify={setNotice}
+                />
                 <MeetingSettings state={state} setState={setState} />
                 <button
                   className="button button-primary find-button"
@@ -233,11 +273,12 @@ export default function App() {
                   <Icon name="arrow" />
                 </button>
                 <p className="settings-footnote">
-                  <Icon name="shield" /> No calendars. No accounts. Computed
-                  locally.
+                  <Icon name="shield" /> No accounts. Imported calendars stay in
+                  this browser. Computed locally.
                 </p>
               </aside>
               <WorkspaceResults
+                input={searchInput}
                 state={state}
                 setState={setState}
                 copy={copy}
@@ -287,9 +328,17 @@ export default function App() {
 function ZoneSettings({
   state,
   setState,
+  calendars,
+  calendarResults,
+  onCalendar,
+  notify,
 }: {
   state: WebState;
   setState: StateSetter;
+  calendars: Record<string, ImportedCalendar>;
+  calendarResults: Record<string, CalendarResult>;
+  onCalendar: (id: string, calendar: ImportedCalendar | null) => void;
+  notify: (message: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [picker, setPicker] = useState(false);
@@ -523,7 +572,16 @@ function ZoneSettings({
                   <HolidayPresetField
                     zone={zone}
                     from={state.input.startDate}
-                    onChange={(holidayPreset) => change(index, { holidayPreset })}
+                    onChange={(holidayPreset) =>
+                      change(index, { holidayPreset })
+                    }
+                  />
+                  <CalendarField
+                    zone={zone}
+                    calendar={calendars[zone.id]}
+                    result={calendarResults[zone.id]}
+                    onChange={(calendar) => onCalendar(zone.id, calendar)}
+                    notify={notify}
                   />
                   <p className="detail-hint">
                     Work must fit within allowed hours. For night shifts, set a
@@ -640,7 +698,10 @@ function HolidayPresetField({
   const upcoming = useMemo(() => {
     if (!zone.holidayPreset || !/^\d{4}-\d{2}-\d{2}$/.test(from)) return [];
     const year = Number(from.slice(0, 4));
-    return [...presetHolidays(zone.holidayPreset, year), ...presetHolidays(zone.holidayPreset, year + 1)]
+    return [
+      ...presetHolidays(zone.holidayPreset, year),
+      ...presetHolidays(zone.holidayPreset, year + 1),
+    ]
       .filter((holiday) => holiday.date >= from)
       .slice(0, 3);
   }, [zone.holidayPreset, from]);
@@ -650,7 +711,11 @@ function HolidayPresetField({
       <select
         aria-label={`${zone.label} public holidays`}
         value={zone.holidayPreset ?? ""}
-        onChange={(event) => onChange((event.target.value || undefined) as HolidayPreset | undefined)}
+        onChange={(event) =>
+          onChange(
+            (event.target.value || undefined) as HolidayPreset | undefined,
+          )
+        }
       >
         <option value="">None</option>
         {holidayPresetIds.map((id) => (
@@ -662,10 +727,113 @@ function HolidayPresetField({
       </select>
       {upcoming.length > 0 && (
         <span className="detail-hint">
-          Next: {upcoming.map((holiday) => `${DateTime.fromISO(holiday.date).setLocale("en").toFormat("d LLL")} ${holiday.name}${holiday.approximate ? " (approx.)" : ""}`).join(" · ")}
+          Next:{" "}
+          {upcoming
+            .map(
+              (holiday) =>
+                `${DateTime.fromISO(holiday.date).setLocale("en").toFormat("d LLL")} ${holiday.name}${holiday.approximate ? " (approx.)" : ""}`,
+            )
+            .join(" · ")}
         </span>
       )}
     </label>
+  );
+}
+
+/** Import an .ics file (or pasted calendar text) as busy times for one zone. */
+function CalendarField({
+  zone,
+  calendar,
+  result,
+  onChange,
+  notify,
+}: {
+  zone: NormalizedInput["zones"][number];
+  calendar?: ImportedCalendar;
+  result?: CalendarResult;
+  onChange: (calendar: ImportedCalendar | null) => void;
+  notify: (message: string) => void;
+}) {
+  const [pasted, setPasted] = useState("");
+  const label = zone.label ?? zone.id;
+  return (
+    <div className="calendar-field">
+      <span className="field-label">Busy calendar</span>
+      {calendar ? (
+        <div className="calendar-status">
+          <p>
+            <strong>{calendar.name}</strong>
+            {result && "error" in result
+              ? ` couldn't be read: ${result.error}`
+              : result
+                ? `: ${result.busy.length} busy time${result.busy.length === 1 ? "" : "s"} in range, from ${result.events} event${result.events === 1 ? "" : "s"}.`
+                : ""}
+          </p>
+          {result &&
+            "warnings" in result &&
+            result.warnings.map((warning) => (
+              <p key={warning} className="detail-hint">
+                {warning}
+              </p>
+            ))}
+          <button
+            type="button"
+            className="text-button"
+            aria-label={`Remove ${label} busy calendar`}
+            onClick={() => onChange(null)}
+          >
+            Remove calendar
+          </button>
+        </div>
+      ) : (
+        <>
+          <label className="calendar-upload">
+            Import .ics file
+            <input
+              type="file"
+              accept=".ics,text/calendar"
+              aria-label={`${label} busy calendar`}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                if (file.size > MAX_CALENDAR_BYTES) {
+                  notify(
+                    "That calendar file is over 5 MB. Export a shorter date range.",
+                  );
+                  return;
+                }
+                onChange({ name: file.name, text: await file.text() });
+              }}
+            />
+          </label>
+          <details className="calendar-paste">
+            <summary>Or paste calendar text</summary>
+            <textarea
+              aria-label={`${label} calendar text`}
+              placeholder="BEGIN:VCALENDAR"
+              value={pasted}
+              onChange={(event) => setPasted(event.target.value)}
+            />
+            <button
+              type="button"
+              className="text-button"
+              disabled={!pasted.trim()}
+              onClick={() => {
+                onChange({ name: "Pasted calendar", text: pasted });
+                setPasted("");
+              }}
+            >
+              Use pasted calendar
+            </button>
+          </details>
+        </>
+      )}
+      <span className="detail-hint">
+        Read only in this browser. Busy times aren't saved or put in share
+        links, and event titles are ignored.
+      </span>
+    </div>
   );
 }
 
@@ -951,17 +1119,20 @@ function MeetingSettings({
 }
 
 function WorkspaceResults({
+  input,
   state,
   setState,
   copy,
   notify,
 }: {
+  /** state.input plus in-memory calendar busy times. */
+  input: NormalizedInput;
   state: WebState;
   setState: StateSetter;
   copy: (text: string, message: string) => Promise<void>;
   notify: (message: string) => void;
 }) {
-  const checked = useMemo(() => validateInput(state.input), [state.input]);
+  const checked = useMemo(() => validateInput(input), [input]);
   const search = useMemo(() => {
     if (!checked.success)
       return {
@@ -1063,6 +1234,7 @@ function WorkspaceResults({
             ["quiet", "Quiet hours"],
             ["weekend", "Weekend"],
             ["holiday", "Holiday"],
+            ["busy", "Busy (calendar)"],
             ["prayer", "Prayer"],
           ].map(([kind, label]) => (
             <span key={kind}>

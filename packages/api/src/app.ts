@@ -450,7 +450,6 @@ export function createApp(options: AppOptions = {}) {
       );
     } catch (error) {
       if (!(error instanceof ScheduleInputError)) throw error;
-      // Report core's displayZones.N as the query parameter users actually sent.
       throw new ScheduleInputError(
         error.issues.map((issue) => ({
           ...issue,

@@ -649,62 +649,184 @@ describe("cron over HTTP", () => {
   });
 });
 
-describe('recurring meetings over HTTP', () => {
+describe("recurring meetings over HTTP", () => {
   const recurring = (query: Record<string, string | string[]>) => {
     const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) for (const item of Array.isArray(value) ? value : [value]) params.append(key, item);
+    for (const [key, value] of Object.entries(query))
+      for (const item of Array.isArray(value) ? value : [value])
+        params.append(key, item);
     return app.request(`/v1/recurring?${params}`);
   };
 
-  it('returns core recurringImpact output, sharing the slots query parser', async () => {
-    const response = await recurring({ zones: 'Europe/London,Asia/Dhaka', date: '2026-10-19', time: '15:00', weeks: '3', duration: '45', quiet: '08:00-21:00', weekend: 'Asia/Dhaka=fri,sat' });
+  it("returns core recurringImpact output, sharing the slots query parser", async () => {
+    const response = await recurring({
+      zones: "Europe/London,Asia/Dhaka",
+      date: "2026-10-19",
+      time: "15:00",
+      weeks: "3",
+      duration: "45",
+      quiet: "08:00-21:00",
+      weekend: "Asia/Dhaka=fri,sat",
+    });
     expect(response.status).toBe(200);
     const body = recurringResultSchema.parse(await response.json());
-    expect(body).toEqual(recurringImpact({ zones: [{ id: 'Europe/London', quietBefore: '08:00', quietAfter: '21:00' }, { id: 'Asia/Dhaka', quietBefore: '08:00', quietAfter: '21:00', weekend: [5, 6] }], startDate: '2026-10-19', time: '15:00', weeks: 3, durationMinutes: 45 }));
-    expect(body.periods.map(period => [period.from, period.zones[1]!.localTime, period.zones[1]!.classification])).toEqual([
-      ['2026-10-19', '20:00', 'acceptable'],
-      ['2026-10-26', '21:00', 'blocked']
+    expect(body).toEqual(
+      recurringImpact({
+        zones: [
+          { id: "Europe/London", quietBefore: "08:00", quietAfter: "21:00" },
+          {
+            id: "Asia/Dhaka",
+            quietBefore: "08:00",
+            quietAfter: "21:00",
+            weekend: [5, 6],
+          },
+        ],
+        startDate: "2026-10-19",
+        time: "15:00",
+        weeks: 3,
+        durationMinutes: 45,
+      }),
+    );
+    expect(
+      body.periods.map((period) => [
+        period.from,
+        period.zones[1]!.localTime,
+        period.zones[1]!.classification,
+      ]),
+    ).toEqual([
+      ["2026-10-19", "20:00", "acceptable"],
+      ["2026-10-26", "21:00", "blocked"],
     ]);
-    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
   });
 
-  it('defaults to 26 weeks', async () => {
-    const body = recurringResultSchema.parse(await (await recurring({ zones: 'UTC', date: '2026-10-19', time: '09:00' })).json());
+  it("defaults to 26 weeks", async () => {
+    const body = recurringResultSchema.parse(
+      await (
+        await recurring({ zones: "UTC", date: "2026-10-19", time: "09:00" })
+      ).json(),
+    );
     expect(body.occurrences).toHaveLength(26);
   });
 
   it.each([
-    [{ zones: 'UTC', date: '2026-10-19' }, 'time'],
-    [{ zones: 'UTC', date: '2026-10-19', time: '9am' }, 'time'],
-    [{ zones: 'UTC', date: '2026-10-19', time: '09:00', weeks: '53' }, 'weeks'],
-    [{ zones: 'UTC', time: '09:00' }, 'date'],
-    [{ zones: 'UTC,Asia/Dhka', date: '2026-10-19', time: '09:00' }, 'zones[1].id'],
-    [{ zones: 'UTC', date: '2026-10-19', time: '09:00', top: '5' }, 'top']
-  ])('rejects %j', async (query, field) => {
+    [{ zones: "UTC", date: "2026-10-19" }, "time"],
+    [{ zones: "UTC", date: "2026-10-19", time: "9am" }, "time"],
+    [{ zones: "UTC", date: "2026-10-19", time: "09:00", weeks: "53" }, "weeks"],
+    [{ zones: "UTC", time: "09:00" }, "date"],
+    [
+      { zones: "UTC,Asia/Dhka", date: "2026-10-19", time: "09:00" },
+      "zones[1].id",
+    ],
+    [{ zones: "UTC", date: "2026-10-19", time: "09:00", top: "5" }, "top"],
+  ])("rejects %j", async (query, field) => {
     const error = await publicError(await recurring(query));
     expect(error.details).toContainEqual(expect.objectContaining({ field }));
   });
 });
 
-describe('holiday presets over HTTP', () => {
-  it('applies repeated holidayPreset parameters on GET and per-zone presets on POST', async () => {
-    const base = 'zones=Asia/Dhaka,Europe/London&date=2026-12-16&days=1';
-    const open = slotsResultSchema.parse(await (await app.request(`/v1/slots?${base}`)).json());
+describe("holiday presets over HTTP", () => {
+  it("applies repeated holidayPreset parameters on GET and per-zone presets on POST", async () => {
+    const base = "zones=Asia/Dhaka,Europe/London&date=2026-12-16&days=1";
+    const open = slotsResultSchema.parse(
+      await (await app.request(`/v1/slots?${base}`)).json(),
+    );
     expect(open.slots.length).toBeGreaterThan(0);
-    const blocked = slotsResultSchema.parse(await (await app.request(`/v1/slots?${base}&holidayPreset=Asia/Dhaka=BD`)).json());
+    const blocked = slotsResultSchema.parse(
+      await (
+        await app.request(`/v1/slots?${base}&holidayPreset=Asia/Dhaka=BD`)
+      ).json(),
+    );
     expect(blocked.slots).toEqual([]);
-    expect(blocked.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
-    const posted = slotsResultSchema.parse(await (await post({ zones: [{ id: 'Asia/Dhaka', holidayPreset: 'BD' }, { id: 'Europe/London' }], startDate: '2026-12-16', days: 1 })).json());
+    expect(blocked.diagnostics.mostRestrictive).toMatchObject({
+      zoneId: "Asia/Dhaka",
+      constraint: "holiday",
+    });
+    const posted = slotsResultSchema.parse(
+      await (
+        await post({
+          zones: [
+            { id: "Asia/Dhaka", holidayPreset: "BD" },
+            { id: "Europe/London" },
+          ],
+          startDate: "2026-12-16",
+          days: 1,
+        })
+      ).json(),
+    );
     expect(posted.slots).toEqual([]);
   });
 
-  it('applies presets to recurring meetings', async () => {
-    const body = recurringResultSchema.parse(await (await app.request('/v1/recurring?zones=Europe/London,Asia/Dhaka&date=2026-12-09&time=10:00&weeks=2&holidayPreset=Asia/Dhaka=BD')).json());
-    expect(body.periods.map(period => period.zones[1]!.classification)).toEqual(['ideal', 'blocked']);
+  it("applies presets to recurring meetings", async () => {
+    const body = recurringResultSchema.parse(
+      await (
+        await app.request(
+          "/v1/recurring?zones=Europe/London,Asia/Dhaka&date=2026-12-09&time=10:00&weeks=2&holidayPreset=Asia/Dhaka=BD",
+        )
+      ).json(),
+    );
+    expect(
+      body.periods.map((period) => period.zones[1]!.classification),
+    ).toEqual(["ideal", "blocked"]);
   });
 
-  it('rejects unknown presets with the parameter name', async () => {
-    const error = await publicError(await app.request('/v1/slots?zones=UTC&date=2026-12-16&holidayPreset=UTC=FR'));
-    expect(error.details).toEqual([{ field: 'holidayPreset', message: 'Unknown holiday preset "FR"; use BD, GB-ENG, US or none' }]);
+  it("rejects unknown presets with the parameter name", async () => {
+    const error = await publicError(
+      await app.request(
+        "/v1/slots?zones=UTC&date=2026-12-16&holidayPreset=UTC=FR",
+      ),
+    );
+    expect(error.details).toEqual([
+      {
+        field: "holidayPreset",
+        message: 'Unknown holiday preset "FR"; use BD, GB-ENG, US or none',
+      },
+    ]);
+  });
+});
+
+describe("busy times over HTTP", () => {
+  it("blocks POSTed busy intervals and reports them in diagnostics", async () => {
+    const response = await post({
+      zones: [
+        {
+          id: "UTC",
+          weekend: [],
+          busy: [
+            { start: "2026-11-02T00:00:00Z", end: "2026-11-03T00:00:00Z" },
+          ],
+        },
+        { id: "Europe/London" },
+      ],
+      startDate: "2026-11-02",
+      days: 1,
+    });
+    expect(response.status).toBe(200);
+    const body = slotsResultSchema.parse(await response.json());
+    expect(body.slots).toEqual([]);
+    expect(body.diagnostics.mostRestrictive).toMatchObject({
+      zoneId: "UTC",
+      constraint: "busy",
+    });
+  });
+
+  it("validates busy intervals with their path", async () => {
+    const error = await publicError(
+      await post({
+        zones: [
+          {
+            id: "UTC",
+            busy: [
+              { start: "2026-11-02T11:00:00Z", end: "2026-11-02T10:00:00Z" },
+            ],
+          },
+        ],
+        startDate: "2026-11-02",
+      }),
+    );
+    expect(error.details).toContainEqual({
+      field: "zones[0].busy[0].end",
+      message: "end must be after start",
+    });
   });
 });

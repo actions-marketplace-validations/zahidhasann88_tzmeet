@@ -59,7 +59,7 @@ function detail(path: string, message: string, value?: unknown) {
     message = `${field}${message.slice(path.length)}`;
   return { field, message };
 }
-/** Translate zod and core helper errors into exact field/message pairs. */
+
 export function validationError(
   error: z.ZodError | ScheduleInputError | InputValidationError,
   raw?: unknown,

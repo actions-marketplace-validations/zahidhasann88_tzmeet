@@ -2214,3 +2214,86 @@ input[aria-invalid="true"] {
 .recurring-warnings li.is-warning {
   border-left-color: #c9783f;
 }
+
+:root {
+  --busy: #cbbfe0;
+}
+:root[data-theme="dark"] {
+  --busy: #6b5b86;
+}
+.kind-busy {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--busy),
+    var(--busy) 4px,
+    var(--quiet) 4px,
+    var(--quiet) 6px
+  );
+}
+.calendar-field {
+  display: grid;
+  gap: 6px;
+}
+.field-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.calendar-upload {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+  background: var(--surface);
+}
+.calendar-upload:hover {
+  border-color: var(--muted);
+}
+.calendar-upload:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.calendar-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+}
+.calendar-status {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+  display: grid;
+  gap: 4px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.calendar-paste summary {
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.calendar-paste textarea {
+  min-height: 80px;
+  margin: 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  resize: vertical;
+}
+.text-button {
+  justify-self: start;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 2px 0;
+}

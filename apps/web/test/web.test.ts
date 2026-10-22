@@ -3,6 +3,7 @@ import { classifySpan, classifySpans, findSlots, type Slot } from '@tzmeet/core'
 import { calendarText, foldLine, inviteText } from '../src/invite';
 import { decodeState, defaultState, encodeState, initials, parseState, persistState, regionalZone, restoreState, STORAGE_KEY } from '../src/state';
 import { makeTimeline } from '../src/timeline';
+import { readCalendars, withBusy } from '../src/calendars';
 import { cronHash, defaultCronState, fieldLabels, isCronRoute, parseCronHash } from '../src/cron-state';
 
 function fixture(): Slot {
@@ -168,5 +169,25 @@ describe('holiday presets in shared state', () => {
     state.input.startDate = '2026-11-02';
     state.input.zones[0]!.holidayPreset = 'BD';
     expect(decodeState(`?${encodeState(state)}`)!.input.zones[0]!.holidayPreset).toBe('BD');
+  });
+});
+
+describe('imported calendars', () => {
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:1', 'DTSTART;VALUE=DATE:20261102', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+
+  it('reads busy times per zone and merges them into the search input only', () => {
+    const state = defaultState();
+    state.input.startDate = '2026-11-02';
+    const results = readCalendars({ 'Europe/London': { name: 'london.ics', text: ics }, 'Asia/Tokyo': { name: 'gone.ics', text: ics } }, state.input);
+    expect(Object.keys(results)).toEqual(['Europe/London']);
+    expect(results['Europe/London']).toMatchObject({ busy: [{ start: '2026-11-02T00:00:00.000Z', end: '2026-11-03T00:00:00.000Z' }], events: 1 });
+    const merged = withBusy(state.input, results);
+    expect(merged.zones.find(zone => zone.id === 'Europe/London')!.busy).toHaveLength(1);
+    expect(state.input.zones.find(zone => zone.id === 'Europe/London')!.busy).toBeUndefined();
+  });
+
+  it('reports unreadable calendars instead of throwing', () => {
+    const state = defaultState();
+    expect(readCalendars({ 'Europe/London': { name: 'notes.txt', text: 'hello' } }, state.input)['Europe/London']).toEqual({ error: "This doesn't look like an iCalendar (.ics) file" });
   });
 });

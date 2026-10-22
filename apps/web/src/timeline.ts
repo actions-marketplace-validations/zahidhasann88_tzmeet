@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { classifySpans, type NormalizedInput } from '@tzmeet/core';
 
-export type TimelineKind = 'work' | 'acceptable' | 'quiet' | 'weekend' | 'holiday' | 'prayer';
+export type TimelineKind = 'work' | 'acceptable' | 'quiet' | 'weekend' | 'holiday' | 'busy' | 'prayer';
 export interface TimelineSegment { left: number; width: number; kind: TimelineKind; description: string }
 export interface TimelineRow { id: string; label: string; origin: string; segments: TimelineSegment[] }
 
@@ -18,6 +18,7 @@ export function makeTimeline(input: NormalizedInput, date: string): TimelineRow[
     evaluations.forEach((evaluation, i) => {
       const kind: TimelineKind = evaluation.constraints.includes('weekend') ? 'weekend'
         : evaluation.constraints.includes('holiday') ? 'holiday'
+        : evaluation.constraints.includes('busy') ? 'busy'
         : evaluation.constraints.includes('prayer') ? 'prayer'
           : evaluation.constraints.includes('quiet') ? 'quiet'
             : evaluation.classification === 'ideal' ? 'work' : 'acceptable';

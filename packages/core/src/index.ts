@@ -13,6 +13,7 @@ export {
   configSchema,
   zoneSchema,
   prayerSchema,
+  busyIntervalSchema,
   cities,
   prayerMethods,
 } from "./schema.js";
@@ -70,6 +71,8 @@ export { describeCron } from "./cron/describe.js";
 export { recurringImpact, recurringSchema } from "./recurring.js";
 export { holidayPresets, holidayPresetIds, presetHolidays, suggestHolidayPreset } from "./holidays.js";
 export type { Holiday, HolidayPreset } from "./holidays.js";
+export { parseIcsBusy } from "./ics.js";
+export type { BusyInterval, IcsBusyOptions, IcsBusyResult } from "./ics.js";
 export type {
   RecurringImpact,
   RecurringInput,

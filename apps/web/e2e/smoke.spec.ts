@@ -368,31 +368,111 @@ test("cron explainer: DST warnings, field errors, zones, link round-trip and acc
   expect(errors).toEqual([]);
 });
 
-test('checks a slot over the coming weeks of DST changes', async ({ page }) => {
+test("checks a slot over the coming weeks of DST changes", async ({ page }) => {
   await open(page);
-  const toggle = page.getByRole('button', { name: 'Check slot 1 over the coming weeks', exact: true });
+  const toggle = page.getByRole("button", {
+    name: "Check slot 1 over the coming weeks",
+    exact: true,
+  });
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  const panel = page.locator('#over-time-0');
-  await expect(panel).toContainText('next 26 weeks');
-  await expect(panel).toContainText('Local times change');
-  await expect(panel.getByRole('cell', { name: 'America/New_York clocks went forward 1 hour on 2027-03-14' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const audit = await new AxeBuilder({ page }).include('#over-time-0').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const panel = page.locator("#over-time-0");
+  await expect(panel).toContainText("next 26 weeks");
+  await expect(panel).toContainText("Local times change");
+  await expect(
+    panel.getByRole("cell", {
+      name: "America/New_York clocks went forward 1 hour on 2027-03-14",
+    }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  const audit = await new AxeBuilder({ page })
+    .include("#over-time-0")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
   expect(audit.violations).toEqual([]);
   await toggle.click();
   await expect(panel).toHaveCount(0);
 });
 
-test('applies a public holiday preset and lists upcoming holidays', async ({ page }) => {
+test("applies a public holiday preset and lists upcoming holidays", async ({
+  page,
+}) => {
   await open(page);
-  await page.getByRole('button', { name: 'Settings for Dhaka', exact: true }).click();
-  await expect(page.getByLabel('Dhaka public holidays')).toContainText('Bangladesh (suggested)');
-  await page.getByLabel('Dhaka public holidays').selectOption('BD');
-  await expect(page.locator('.zone-details')).toContainText('Next: 16 Dec Victory Day · 25 Dec Christmas Day');
-  await page.getByLabel('Starting date', { exact: true }).fill('2026-12-16');
-  await page.getByLabel('Days to search').fill('1');
-  await expect(page.locator('.empty-results')).toContainText('holiday in Dhaka');
-  await page.getByLabel('Dhaka public holidays').selectOption('');
-  await expect(page.locator('.slot-card').first()).toBeVisible();
+  await page
+    .getByRole("button", { name: "Settings for Dhaka", exact: true })
+    .click();
+  await expect(page.getByLabel("Dhaka public holidays")).toContainText(
+    "Bangladesh (suggested)",
+  );
+  await page.getByLabel("Dhaka public holidays").selectOption("BD");
+  await expect(page.locator(".zone-details")).toContainText(
+    "Next: 16 Dec Victory Day · 25 Dec Christmas Day",
+  );
+  await page.getByLabel("Starting date", { exact: true }).fill("2026-12-16");
+  await page.getByLabel("Days to search").fill("1");
+  await expect(page.locator(".empty-results")).toContainText(
+    "holiday in Dhaka",
+  );
+  await page.getByLabel("Dhaka public holidays").selectOption("");
+  await expect(page.locator(".slot-card").first()).toBeVisible();
+});
+
+test("imports a busy calendar in the browser without sharing it", async ({
+  page,
+}) => {
+  await mockClipboard(page);
+  await open(page);
+  const first = page.locator(".slot-card").first();
+  await expect(first).toContainText("Monday, 2 Nov");
+  await page
+    .getByRole("button", { name: "Settings for London", exact: true })
+    .click();
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "BEGIN:VEVENT",
+    "UID:offsite",
+    "DTSTART;VALUE=DATE:20261102",
+    "SUMMARY:Offsite",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  await page
+    .getByLabel("London busy calendar")
+    .setInputFiles({
+      name: "london.ics",
+      mimeType: "text/calendar",
+      buffer: Buffer.from(ics),
+    });
+  await expect(page.locator(".calendar-status")).toContainText(
+    "london.ics: 1 busy time in range, from 1 event.",
+  );
+  await expect(first).not.toContainText("Monday, 2 Nov");
+  await expect(page.locator(".timeline-legend")).toContainText(
+    "Busy (calendar)",
+  );
+  const audit = await new AxeBuilder({ page })
+    .include(".zone-details")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+  await page.getByRole("button", { name: "Share workspace" }).click();
+  const share = await page.evaluate(
+    () => document.documentElement.dataset.clipboard!,
+  );
+  const shared = JSON.parse(new URL(share).searchParams.get("state")!);
+  expect(
+    shared.input.zones.some((zone: Record<string, unknown>) => "busy" in zone),
+  ).toBe(false);
+  expect(
+    await page.evaluate(() => localStorage.getItem("tzmeet:state:v1")),
+  ).not.toContain("busy");
+  await page
+    .getByRole("button", { name: "Remove London busy calendar" })
+    .click();
+  await expect(first).toContainText("Monday, 2 Nov");
 });

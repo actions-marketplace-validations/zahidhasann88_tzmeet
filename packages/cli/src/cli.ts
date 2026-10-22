@@ -11,6 +11,7 @@ import { readConfig, resolveOptions, type CliFlags } from "./config.js";
 import { formatTable, selectTop } from "./output.js";
 import { defaultCronZones, formatCron } from "./cron.js";
 import { formatRecurring } from "./recurring.js";
+import { applyBusy } from "./busy.js";
 
 export interface CliContext {
   cwd?: string;
@@ -85,6 +86,11 @@ export function runCLI(
       collect,
     )
     .option(
+      "--busy <IANA_ZONE=file.ics>",
+      "block busy times from an iCalendar export, e.g. Asia/Dhaka=me.ics; repeatable",
+      collect,
+    )
+    .option(
       "--quiet <HH:mm-HH:mm>",
       "override allowed hours in every zone (default: 08:00-21:00)",
     )
@@ -135,7 +141,8 @@ No slots found is a successful search (exit 0); invalid input exits 1.
         flags,
         context.now?.() ?? new Date(),
       );
-      const result = selectTop(findSlots(input), top);
+      const busy = applyBusy(input, flags.busy, context.cwd ?? process.cwd(), input.days, writeErr);
+      const result = selectTop(findSlots(busy), top);
       writeOut(
         flags.json
           ? `${JSON.stringify(result, null, 2)}\n`
@@ -229,7 +236,7 @@ Quote the expression so the shell doesn't expand *:
       "after",
       `
 The meeting repeats every week on the weekday of --date, at --time in the first zone.
-Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holiday, --holiday-preset,
+Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holiday, --holiday-preset, --busy,
 --quiet, --prayer-*, --config) work the same as for the main search.
   tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
   tzmeet recurring --zones America/New_York,Asia/Dhaka --time 09:00 --weeks 52 --json
@@ -239,13 +246,15 @@ Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holid
       const flags = program.opts<CliFlags>();
       const config = readConfig(context.cwd ?? process.cwd(), flags.config);
       const { input } = resolveOptions(config, flags, context.now?.() ?? new Date());
+      const weeks = parseIntegerOption(options.weeks, "weeks", 26);
+      const busy = applyBusy(input, flags.busy, context.cwd ?? process.cwd(), weeks * 7, writeErr);
       const result = recurringImpact({
-        zones: input.zones,
+        zones: busy.zones,
         startDate: input.startDate,
         durationMinutes: input.durationMinutes,
         ...(input.prayer ? { prayer: input.prayer } : {}),
         time: options.time,
-        weeks: parseIntegerOption(options.weeks, "weeks", 26),
+        weeks,
       });
       writeOut(flags.json ? `${JSON.stringify(result, null, 2)}
 ` : formatRecurring(result));
