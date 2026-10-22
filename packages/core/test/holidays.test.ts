@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   findSlots,
+  holidayListYears,
   parseScheduleInput,
   presetHolidays,
+  presetNote,
   ScheduleInputError,
   suggestHolidayPreset,
 } from "../src/index.js";
@@ -115,15 +117,21 @@ describe("Bangladesh public holidays", () => {
     expect(
       year
         .filter((holiday) => !holiday.approximate)
-        .map((holiday) => holiday.date),
+        .map((holiday) => `${holiday.date} ${holiday.name}`),
     ).toEqual([
-      "2026-02-21",
-      "2026-03-26",
-      "2026-04-14",
-      "2026-05-01",
-      "2026-12-16",
-      "2026-12-25",
+      "2026-02-21 Shaheed Day and International Mother Language Day",
+      "2026-03-26 Independence Day",
+      "2026-04-14 Pohela Boishakh (Bengali New Year)",
+      "2026-05-01 Buddha Purnima",
+      "2026-05-01 May Day",
+      "2026-09-04 Janmashtami",
+      "2026-10-20 Durga Puja (Nabami)",
+      "2026-10-21 Durga Puja (Bijoya Dashami)",
+      "2026-12-16 Victory Day",
+      "2026-12-25 Christmas Day",
     ]);
+    expect(presetNote("BD", 2026)).toBeNull();
+    expect(presetNote("BD", 2027)).toContain("Hindu and Buddhist holidays");
   });
 });
 
@@ -136,9 +144,12 @@ describe("presets in scheduling", () => {
         "America/Chicago",
         "America/Indiana/Indianapolis",
         "Pacific/Honolulu",
+        "Asia/Kolkata",
+        "Asia/Karachi",
+        "Asia/Dubai",
         "Asia/Tokyo",
       ].map(suggestHolidayPreset),
-    ).toEqual(["BD", "GB-ENG", "US", "US", "US", undefined]);
+    ).toEqual(["BD", "GB-ENG", "US", "US", "US", "IN", "PK", "AE", undefined]);
   });
 
   it("blocks preset holidays like weekends and reports them in diagnostics", () => {
@@ -210,6 +221,96 @@ describe("presets in scheduling", () => {
         date: "2026-11-02",
         holidayPreset: ["UTC=FR"],
       }),
-    ).toThrow(/use BD, GB-ENG, US or none/);
+    ).toThrow(/use BD, GB-ENG, IN, PK, AE, US or none/);
+  });
+});
+
+describe("India central government holidays", () => {
+  it("uses the DoPT gazetted lists for 2026 and 2027", () => {
+    expect(holidayListYears("IN")).toEqual([2026, 2027]);
+    const year = presetHolidays("IN", 2026);
+    expect(year).toHaveLength(17);
+    expect(
+      year
+        .filter((holiday) =>
+          ["Holi", "Diwali", "Dussehra"].includes(holiday.name),
+        )
+        .map((holiday) => holiday.date),
+    ).toEqual(["2026-03-04", "2026-10-20", "2026-11-08"]);
+    expect(year.find((holiday) => holiday.name === "Id-ul-Fitr")).toEqual({
+      date: "2026-03-21",
+      name: "Id-ul-Fitr",
+      approximate: true,
+    });
+    expect(
+      presetHolidays("IN", 2027).find(
+        (holiday) => holiday.name === "Ram Navami",
+      )!.date,
+    ).toBe("2027-04-15");
+    expect(presetNote("IN", 2027)).toBeNull();
+  });
+
+  it("falls back to fixed national holidays, and says so, in other years", () => {
+    expect(
+      presetHolidays("IN", 2028).map(
+        (holiday) => `${holiday.date} ${holiday.name}`,
+      ),
+    ).toEqual([
+      "2028-01-26 Republic Day",
+      "2028-04-14 Good Friday",
+      "2028-08-15 Independence Day",
+      "2028-10-02 Mahatma Gandhi's Birthday",
+      "2028-12-25 Christmas Day",
+    ]);
+    expect(presetNote("IN", 2028)).toBe(
+      "Only fixed national holidays and Good Friday are included for 2028. Festival dates come from the government's yearly list, which tzmeet has for 2026–2027.",
+    );
+  });
+});
+
+describe("Pakistan and UAE holidays", () => {
+  const named = (preset: "PK" | "AE", year: number, name: string) =>
+    presetHolidays(preset, year)
+      .filter((holiday) => holiday.name.startsWith(name))
+      .map((holiday) => holiday.date);
+
+  it("matches Pakistan's 2026 notifications for Eid ul-Adha and Ashura", () => {
+    expect(named("PK", 2026, "Eid ul-Adha")).toEqual([
+      "2026-05-26",
+      "2026-05-27",
+      "2026-05-28",
+    ]);
+    expect(named("PK", 2026, "Ashura")).toEqual(["2026-06-24", "2026-06-25"]);
+    expect(
+      presetHolidays("PK", 2026)
+        .filter((holiday) => !holiday.approximate)
+        .map((holiday) => holiday.date),
+    ).toEqual([
+      "2026-02-05",
+      "2026-03-23",
+      "2026-05-01",
+      "2026-05-28",
+      "2026-08-14",
+      "2026-11-09",
+      "2026-12-25",
+    ]);
+    expect(presetNote("PK", 2030)).toBeNull();
+  });
+
+  it("matches the UAE's 2026 Eid and Arafat Day holidays", () => {
+    expect(named("AE", 2026, "Eid al-Fitr")).toEqual([
+      "2026-03-19",
+      "2026-03-20",
+      "2026-03-21",
+      "2026-03-22",
+    ]);
+    expect([
+      ...named("AE", 2026, "Arafat"),
+      ...named("AE", 2026, "Eid al-Adha"),
+    ]).toEqual(["2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29"]);
+    expect(named("AE", 2026, "National Day")).toEqual([
+      "2026-12-02",
+      "2026-12-03",
+    ]);
   });
 });

@@ -60,7 +60,12 @@ export type {
   TimeZoneInfo,
 } from "./time-transport.js";
 export { listTransitions, resolveLocal } from "./transitions.js";
-export { parseCron, detectDialect, cronDialects, cronDialectName } from "./cron/parse.js";
+export {
+  parseCron,
+  detectDialect,
+  cronDialects,
+  cronDialectName,
+} from "./cron/parse.js";
 export type {
   CronDialect,
   CronFieldName,
@@ -70,7 +75,15 @@ export type {
 } from "./cron/parse.js";
 export { describeCron } from "./cron/describe.js";
 export { recurringImpact, recurringSchema } from "./recurring.js";
-export { holidayPresets, holidayPresetIds, presetHolidays, ramadanDates, suggestHolidayPreset } from "./holidays.js";
+export {
+  holidayListYears,
+  holidayPresets,
+  holidayPresetIds,
+  presetHolidays,
+  presetNote,
+  ramadanDates,
+  suggestHolidayPreset,
+} from "./holidays.js";
 export type { Holiday, HolidayPreset } from "./holidays.js";
 export { parseIcsBusy } from "./ics.js";
 export { fairRotation } from "./rotation.js";

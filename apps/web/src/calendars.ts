@@ -8,6 +8,7 @@ import {
 export interface ImportedCalendar {
   name: string;
   text: string;
+  remember?: boolean;
 }
 export type CalendarResult = IcsBusyResult | { error: string };
 export const RECURRING_WEEKS = 26;
@@ -64,4 +65,57 @@ export function withBusy(
       return { ...zone, busy: [...(zone.busy ?? []), ...result.busy] };
     }),
   };
+}
+
+export const CALENDAR_STORAGE_KEY = "tzmeet:calendars:v1";
+export const MAX_REMEMBERED_BYTES = 2 * 1024 * 1024;
+
+export function loadRememberedCalendars(
+  storage: Pick<Storage, "getItem"> | null,
+): Record<string, ImportedCalendar> {
+  try {
+    const raw = storage?.getItem(CALENDAR_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const calendars: Record<string, ImportedCalendar> = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      const calendar = value as Partial<ImportedCalendar>;
+      if (
+        typeof calendar?.name === "string" &&
+        typeof calendar.text === "string"
+      )
+        calendars[id] = {
+          name: calendar.name,
+          text: calendar.text,
+          remember: true,
+        };
+    }
+    return calendars;
+  } catch {
+    return {};
+  }
+}
+
+export function saveRememberedCalendars(
+  calendars: Record<string, ImportedCalendar>,
+  storage: Pick<Storage, "setItem" | "removeItem"> | null,
+): boolean {
+  const kept = Object.fromEntries(
+    Object.entries(calendars)
+      .filter(([, calendar]) => calendar.remember)
+      .map(([id, { name, text }]) => [id, { name, text }]),
+  );
+  try {
+    if (!Object.keys(kept).length) {
+      storage?.removeItem(CALENDAR_STORAGE_KEY);
+      return true;
+    }
+    const json = JSON.stringify(kept);
+    if (!storage || json.length > MAX_REMEMBERED_BYTES) return false;
+    storage.setItem(CALENDAR_STORAGE_KEY, json);
+    return true;
+  } catch {
+    return false;
+  }
 }

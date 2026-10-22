@@ -29,7 +29,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 
 `/v1/slots` options: `top` (1–50, default 10) and `format` (`json`, `text` or `ics`).
 
-`/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone). POST zones also accept `busy: [{ start, end }]` intervals (ISO instants) to block calendar busy times.
+`/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|IN|PK|AE|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone). POST zones also accept `busy: [{ start, end }]` intervals (ISO instants) to block calendar busy times.
 
 Both also accept repeatable `specialHours=IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` and `ramadan=IANA_ZONE=HH:mm-HH:mm` for different work hours (POST zones use `specialHours`). Repeat `optional=IANA_ZONE` (or set `optional: true` on a POST zone) for attendees who shouldn't block a time. Add `rotation=2` or `3` to `/v1/slots` to get a `rotation` suggestion: times to alternate weekly so no city always gets the inconvenient slot.
 

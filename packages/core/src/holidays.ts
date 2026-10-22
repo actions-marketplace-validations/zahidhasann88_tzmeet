@@ -1,6 +1,9 @@
 export const holidayPresets = {
   BD: "Bangladesh",
   "GB-ENG": "United Kingdom (England and Wales)",
+  IN: "India (central government, Delhi)",
+  PK: "Pakistan",
+  AE: "United Arab Emirates",
   US: "United States (federal)",
 } as const;
 export type HolidayPreset = keyof typeof holidayPresets;
@@ -129,36 +132,27 @@ function hijriDate(millis: number): { month: number; day: number } | null {
   };
 }
 
-function bangladesh(year: number): Holiday[] {
-  const fixed: [string, number, number][] = [
-    ["Shaheed Day and International Mother Language Day", 2, 21],
-    ["Independence Day", 3, 26],
-    ["Pohela Boishakh (Bengali New Year)", 4, 14],
-    ["May Day", 5, 1],
-    ["Victory Day", 12, 16],
-    ["Christmas Day", 12, 25],
-  ];
-  const list: Holiday[] = fixed.map(([name, month, date]) => ({
-    date: iso(utc(year, month, date)),
-    name,
-    approximate: false,
-  }));
-  const islamic: [string, number, number, number, number][] = [
-    ["Eid al-Fitr", 10, 1, 1, 1],
-    ["Eid al-Adha", 12, 10, 1, 1],
-    ["Ashura", 1, 10, 0, 0],
-    ["Eid-e-Milad-un-Nabi", 3, 12, 0, 0],
-  ];
+// [name, Hijri month, Hijri day, days before, days after]
+type IslamicRule = [string, number, number, number, number];
+
+/** Islamic holidays from the Umm al-Qura calendar, moved by `shift` days; all approximate. */
+function islamicHolidays(
+  year: number,
+  rules: IslamicRule[],
+  shift: number,
+): Holiday[] {
+  const list: Holiday[] = [];
+  // Scan a little either side so holidays spanning New Year are found.
   for (
-    let t = utc(year, 1, 1) - 3 * day;
-    t <= utc(year, 12, 31) + 3 * day;
+    let t = utc(year, 1, 1) - 5 * day;
+    t <= utc(year, 12, 31) + 5 * day;
     t += day
   ) {
     const date = hijriDate(t);
     if (!date) break;
-    for (const [name, month, target, before, after] of islamic) {
+    for (const [name, month, target, before, after] of rules) {
       if (date.month !== month || date.day !== target) continue;
-      const main = t + day;
+      const main = t + shift * day;
       for (let offset = -before; offset <= after; offset++) {
         const when = iso(main + offset * day);
         if (when.startsWith(String(year)))
@@ -171,6 +165,186 @@ function bangladesh(year: number): Holiday[] {
     }
   }
   return list;
+}
+
+const fixedDates = (
+  year: number,
+  fixed: [string, number, number][],
+): Holiday[] =>
+  fixed.map(([name, month, date]) => ({
+    date: iso(utc(year, month, date)),
+    name,
+    approximate: false,
+  }));
+
+/**
+ * Holidays from yearly government lists, for festivals on lunisolar calendars that
+ * can't be calculated here. [date, name, approximate]
+ */
+const yearly: Partial<
+  Record<HolidayPreset, Record<number, [string, string, boolean][]>>
+> = {
+  // Bangladesh Bank and government lists for 2026.
+  BD: {
+    2026: [
+      ["2026-05-01", "Buddha Purnima", false],
+      ["2026-09-04", "Janmashtami", false],
+      ["2026-10-20", "Durga Puja (Nabami)", false],
+      ["2026-10-21", "Durga Puja (Bijoya Dashami)", false],
+    ],
+  },
+  // DoPT gazetted holidays for central government offices in Delhi/New Delhi:
+  // O.M. of 3 July 2025 (2026) and 16 July 2026 (2027). Islamic dates are tentative.
+  IN: {
+    2026: [
+      ["2026-01-26", "Republic Day", false],
+      ["2026-03-04", "Holi", false],
+      ["2026-03-21", "Id-ul-Fitr", true],
+      ["2026-03-26", "Ram Navami", false],
+      ["2026-03-31", "Mahavir Jayanti", false],
+      ["2026-04-03", "Good Friday", false],
+      ["2026-05-01", "Buddha Purnima", false],
+      ["2026-05-27", "Id-ul-Zuha (Bakrid)", true],
+      ["2026-06-26", "Muharram", true],
+      ["2026-08-15", "Independence Day", false],
+      ["2026-08-26", "Milad-un-Nabi", true],
+      ["2026-09-04", "Janmashtami", false],
+      ["2026-10-02", "Mahatma Gandhi's Birthday", false],
+      ["2026-10-20", "Dussehra", false],
+      ["2026-11-08", "Diwali", false],
+      ["2026-11-24", "Guru Nanak's Birthday", false],
+      ["2026-12-25", "Christmas Day", false],
+    ],
+    2027: [
+      ["2027-01-26", "Republic Day", false],
+      ["2027-03-10", "Id-ul-Fitr", true],
+      ["2027-03-23", "Holi", false],
+      ["2027-03-26", "Good Friday", false],
+      ["2027-04-15", "Ram Navami", false],
+      ["2027-04-19", "Mahavir Jayanti", false],
+      ["2027-05-17", "Id-ul-Zuha (Bakrid)", true],
+      ["2027-05-20", "Buddha Purnima", false],
+      ["2027-06-16", "Muharram", true],
+      ["2027-08-15", "Independence Day", false],
+      ["2027-08-15", "Milad-un-Nabi", true],
+      ["2027-08-25", "Janmashtami", false],
+      ["2027-10-02", "Mahatma Gandhi's Birthday", false],
+      ["2027-10-09", "Dussehra", false],
+      ["2027-10-29", "Diwali", false],
+      ["2027-11-14", "Guru Nanak's Birthday", false],
+      ["2027-12-25", "Christmas Day", false],
+    ],
+  },
+};
+const fromList = (preset: HolidayPreset, year: number): Holiday[] =>
+  (yearly[preset]?.[year] ?? []).map(([date, name, approximate]) => ({
+    date,
+    name,
+    approximate,
+  }));
+
+/** Years covered by a yearly government list, for presets that need one. */
+export function holidayListYears(preset: HolidayPreset): number[] {
+  return Object.keys(yearly[preset] ?? {}).map(Number);
+}
+
+/** A note when a preset can't include everything for this year, else null. */
+export function presetNote(preset: HolidayPreset, year: number): string | null {
+  const years = holidayListYears(preset);
+  if (!years.length || years.includes(year)) return null;
+  const range =
+    years.length === 1
+      ? String(years[0])
+      : `${Math.min(...years)}–${Math.max(...years)}`;
+  return preset === "IN"
+    ? `Only fixed national holidays and Good Friday are included for ${year}. Festival dates come from the government's yearly list, which tzmeet has for ${range}.`
+    : `Hindu and Buddhist holidays come from the government's yearly list, which tzmeet has for ${range}; add ${year}'s dates by hand.`;
+}
+
+function bangladesh(year: number): Holiday[] {
+  return [
+    ...fixedDates(year, [
+      ["Shaheed Day and International Mother Language Day", 2, 21],
+      ["Independence Day", 3, 26],
+      ["Pohela Boishakh (Bengali New Year)", 4, 14],
+      ["May Day", 5, 1],
+      ["Victory Day", 12, 16],
+      ["Christmas Day", 12, 25],
+    ]),
+    ...islamicHolidays(
+      year,
+      [
+        ["Eid al-Fitr", 10, 1, 1, 1],
+        ["Eid al-Adha", 12, 10, 1, 1],
+        ["Ashura", 1, 10, 0, 0],
+        ["Eid-e-Milad-un-Nabi", 3, 12, 0, 0],
+      ],
+      1,
+    ),
+    ...fromList("BD", year),
+  ];
+}
+
+function india(year: number): Holiday[] {
+  if (holidayListYears("IN").includes(year)) return fromList("IN", year);
+  return [
+    ...fixedDates(year, [
+      ["Republic Day", 1, 26],
+      ["Independence Day", 8, 15],
+      ["Mahatma Gandhi's Birthday", 10, 2],
+      ["Christmas Day", 12, 25],
+    ]),
+    {
+      date: iso(easter(year) - 2 * day),
+      name: "Good Friday",
+      approximate: false,
+    },
+  ];
+}
+
+function pakistan(year: number): Holiday[] {
+  return [
+    ...fixedDates(year, [
+      ["Kashmir Day", 2, 5],
+      ["Pakistan Day", 3, 23],
+      ["Labour Day", 5, 1],
+      ["Youm-e-Takbeer", 5, 28],
+      ["Independence Day", 8, 14],
+      ["Iqbal Day", 11, 9],
+      ["Quaid-e-Azam Day", 12, 25],
+    ]),
+    ...islamicHolidays(
+      year,
+      [
+        ["Eid ul-Fitr", 10, 1, 0, 2],
+        ["Eid ul-Adha", 12, 10, 1, 1],
+        ["Ashura", 1, 10, 1, 0],
+        ["Eid Milad-un-Nabi", 3, 12, 0, 0],
+      ],
+      0,
+    ),
+  ];
+}
+
+function unitedArabEmirates(year: number): Holiday[] {
+  return [
+    ...fixedDates(year, [
+      ["New Year's Day", 1, 1],
+      ["National Day", 12, 2],
+      ["National Day holiday", 12, 3],
+    ]),
+    ...islamicHolidays(
+      year,
+      [
+        ["Eid al-Fitr", 10, 1, 1, 2],
+        ["Arafat Day", 12, 9, 0, 0],
+        ["Eid al-Adha", 12, 10, 0, 2],
+        ["Islamic New Year", 1, 1, 0, 0],
+        ["Prophet Muhammad's Birthday", 3, 12, 0, 0],
+      ],
+      0,
+    ),
+  ];
 }
 
 export function ramadanDates(
@@ -196,12 +370,14 @@ export function ramadanDates(
 }
 
 export function presetHolidays(preset: HolidayPreset, year: number): Holiday[] {
-  const list =
-    preset === "US"
-      ? unitedStates(year)
-      : preset === "GB-ENG"
-        ? englandAndWales(year)
-        : bangladesh(year);
+  const list = {
+    US: unitedStates,
+    "GB-ENG": englandAndWales,
+    BD: bangladesh,
+    IN: india,
+    PK: pakistan,
+    AE: unitedArabEmirates,
+  }[preset](year);
   return list.sort(
     (a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name),
   );
@@ -231,6 +407,9 @@ export function suggestHolidayPreset(
 ): HolidayPreset | undefined {
   if (zoneId === "Asia/Dhaka") return "BD";
   if (zoneId === "Europe/London") return "GB-ENG";
+  if (zoneId === "Asia/Kolkata" || zoneId === "Asia/Calcutta") return "IN";
+  if (zoneId === "Asia/Karachi") return "PK";
+  if (zoneId === "Asia/Dubai") return "AE";
   if (
     usZones.has(zoneId) ||
     /^America\/(?:Indiana|Kentucky|North_Dakota)\//.test(zoneId)

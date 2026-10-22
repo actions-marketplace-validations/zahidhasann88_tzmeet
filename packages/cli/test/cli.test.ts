@@ -905,7 +905,7 @@ describe("holiday presets", () => {
     ]);
     expect(output.code).toBe(1);
     expect(output.stderr).toContain(
-      'Unknown holiday preset "FR"; use BD, GB-ENG, US or none',
+      'Unknown holiday preset "FR"; use BD, GB-ENG, IN, PK, AE, US or none',
     );
   });
 });

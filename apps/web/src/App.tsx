@@ -19,6 +19,7 @@ import {
   holidayPresetIds,
   holidayPresets,
   presetHolidays,
+  presetNote,
   ramadanDates,
   suggestHolidayPreset,
   type HolidayPreset,
@@ -41,6 +42,8 @@ import { makeTimeline } from "./timeline";
 import CronPage from "./Cron";
 import RecurringPanel from "./Recurring";
 import {
+  loadRememberedCalendars,
+  saveRememberedCalendars,
   MAX_CALENDAR_BYTES,
   readCalendars,
   withBusy,
@@ -65,10 +68,15 @@ export default function App() {
   const [state, setState] = useState<WebState | null>(null);
   const [notice, setNotice] = useState("");
   const [copyFallback, setCopyFallback] = useState("");
-  // Imported calendars stay in memory: never in the URL, storage or share links.
+  // Imported calendars are never in the URL or share links. They're kept in memory,
+  // and in this browser's storage only for those the user chose to remember.
   const [calendars, setCalendars] = useState<Record<string, ImportedCalendar>>(
-    {},
+    () => loadRememberedCalendars(storage()),
   );
+  useEffect(() => {
+    if (!saveRememberedCalendars(calendars, storage()))
+      setNotice("This calendar is too large to remember on this device. It stays until you reload.");
+  }, [calendars]);
   const input = state?.input;
   const calendarResults = useMemo(
     () => (input ? readCalendars(calendars, input) : {}),
@@ -756,6 +764,9 @@ function HolidayPresetField({
             .join(" · ")}
         </span>
       )}
+      {zone.holidayPreset && presetNote(zone.holidayPreset, Number(from.slice(0, 4))) && (
+        <span className="detail-hint">{presetNote(zone.holidayPreset, Number(from.slice(0, 4)))}</span>
+      )}
     </label>
   );
 }
@@ -853,6 +864,15 @@ function CalendarField({
                 {warning}
               </p>
             ))}
+          <label className="inline-check">
+            <input
+              type="checkbox"
+              aria-label={`Remember ${label} busy calendar on this device`}
+              checked={!!calendar.remember}
+              onChange={(event) => onChange({ ...calendar, remember: event.target.checked })}
+            />
+            <span>Remember on this device</span>
+          </label>
           <button
             type="button"
             className="text-button"
@@ -907,8 +927,9 @@ function CalendarField({
         </>
       )}
       <span className="detail-hint">
-        Read only in this browser. Busy times aren't saved or put in share
-        links, and event titles are ignored.
+        Read only in this browser. Busy times are never put in share links,
+        and event titles are ignored. Remembered calendars are saved in this
+        browser only.
       </span>
     </div>
   );

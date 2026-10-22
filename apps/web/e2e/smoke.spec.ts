@@ -62,7 +62,9 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   const original = decodeState(new URL(share).search)!;
   // Compact share format: only settings that differ from the defaults.
   expect(new URL(share).searchParams.has("s")).toBe(true);
-  const legacy = new URLSearchParams({ state: JSON.stringify(original) }).toString();
+  const legacy = new URLSearchParams({
+    state: JSON.stringify(original),
+  }).toString();
   expect(new URL(share).search.length).toBeLessThan(legacy.length / 2);
   expect(original.input.zones.map((zone: { id: string }) => zone.id)).toEqual([
     "Asia/Dhaka",
@@ -90,9 +92,7 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   await expect(restored.locator(".slot-details")).toBeVisible();
   await expect(restored.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect
-    .poll(async () =>
-      decodeState(new URL(restored.url()).search),
-    )
+    .poll(async () => decodeState(new URL(restored.url()).search))
     .toEqual(original);
   expect(errors).toEqual([]);
 });
@@ -527,7 +527,9 @@ test("suggests a fair rotation and stores Ramadan hours with the workspace", asy
   const share = await page.evaluate(
     () => document.documentElement.dataset.clipboard!,
   );
-  const tokyo = decodeState(new URL(share).search)!.input.zones.find((zone: { id: string }) => zone.id === "Asia/Tokyo");
+  const tokyo = decodeState(new URL(share).search)!.input.zones.find(
+    (zone: { id: string }) => zone.id === "Asia/Tokyo",
+  );
   expect(tokyo!.specialHours).toEqual([
     {
       label: "Ramadan",
@@ -548,4 +550,64 @@ test("suggests a fair rotation and stores Ramadan hours with the workspace", asy
   await expect(page.locator('.ramadan-field input[type="time"]')).toHaveCount(
     0,
   );
+});
+
+test("has link previews, and the /cron/ page forwards with its settings", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    "content",
+    /og\/tzmeet-site\.png$/,
+  );
+  const cronPage = await (await page.request.get("./cron/")).text();
+  expect(cronPage).toContain("og/tzmeet-cron.png");
+  await page.goto(
+    "./cron/#e=30+1+*+*+*&d=kubernetes&z=Europe%2FLondon&show=UTC&n=5",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Explain a cron schedule." }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Cron expression")).toHaveValue("30 1 * * *");
+  await expect(page.getByLabel("Cron syntax")).toHaveValue("kubernetes");
+  await expect(page.locator(".cron-table tbody tr")).toHaveCount(5);
+});
+
+test("remembers an imported calendar on this device only when asked", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .getByRole("button", { name: "Settings for London", exact: true })
+    .click();
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "BEGIN:VEVENT",
+    "UID:offsite",
+    "DTSTART;VALUE=DATE:20261102",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  await page
+    .getByLabel("London busy calendar")
+    .setInputFiles({
+      name: "london.ics",
+      mimeType: "text/calendar",
+      buffer: Buffer.from(ics),
+    });
+  await page.getByLabel("Remember London busy calendar on this device").check();
+  await page.reload();
+  await expect(page.locator(".calendar-status")).toContainText(
+    "london.ics: 1 busy time in range",
+  );
+  await expect(
+    page.getByLabel("Remember London busy calendar on this device"),
+  ).toBeChecked();
+  await page
+    .getByLabel("Remember London busy calendar on this device")
+    .uncheck();
+  await page.reload();
+  await expect(page.getByLabel("London busy calendar")).toBeVisible();
+  await expect(page.locator(".calendar-status")).toHaveCount(0);
 });

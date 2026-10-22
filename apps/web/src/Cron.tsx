@@ -21,8 +21,7 @@ import {
   fieldLabels,
   maxDisplayZones,
   parseCronHash,
-  type CronState,
-} from "./cron-state";
+  type CronState, cronShareLink } from "./cron-state";
 
 const examples: { label: string; state: Partial<CronState> }[] = [
   {
@@ -64,7 +63,6 @@ const notes: Record<CronRunNote, string> = {
   "fold-once": "Clocks repeat this time; runs only once",
   "fold-first": "Clocks repeat this time; 1st of 2 runs",
   "fold-second": "Clocks repeat this time; 2nd of 2 runs",
-  "fold-maybe-twice": "Clocks repeat this time; may run again",
 };
 const fieldOrder = [
   "second",
@@ -329,7 +327,7 @@ export default function CronPage({
                   className="button button-outline"
                   onClick={() => {
                     void copy(
-                      `${window.location.origin}${window.location.pathname}${cronHash(state)}`,
+                      cronShareLink(state, window.location.href),
                       "Link copied. It opens this exact schedule.",
                     );
                   }}
@@ -480,7 +478,6 @@ function TimeCell({
   );
 }
 
-/** Free-text zone search; only a real IANA identifier is applied. */
 function ZoneInput({
   label,
   zones,

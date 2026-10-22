@@ -48,7 +48,7 @@ tzmeet zones london
 | `--quiet` | Earliest and latest acceptable time | 08:00-21:00 |
 | `--weekend` | Weekend for one city, e.g. `Europe/London=sat,sun` or `=none` | Sat/Sun (Fri/Sat in Fri/Sat countries) |
 | `--holiday` | Days off for one city, e.g. `Asia/Dhaka=2026-12-16` | |
-| `--holiday-preset` | Public holidays for one city: `BD`, `GB-ENG` (England and Wales) or `US`, e.g. `Asia/Dhaka=BD`. Islamic dates are approximate | |
+| `--holiday-preset` | Public holidays for one city: `BD` (Bangladesh), `GB-ENG` (England and Wales), `IN` (India, central government), `PK` (Pakistan), `AE` (UAE) or `US`, e.g. `Asia/Dhaka=BD`. Islamic dates are approximate; India's festival dates are included for 2026–2027 | |
 | `--busy` | Block busy times from a calendar export for one city, e.g. `Asia/Dhaka=me.ics`. Titles aren't read | |
 | `--special-hours` | Different work hours for a date range, e.g. `Europe/London=2026-12-21..2026-12-31@10:00-16:00` | |
 | `--ramadan` | Work hours during Ramadan for one city, e.g. `Asia/Dhaka=09:00-15:30`. Dates are calculated and approximate | |

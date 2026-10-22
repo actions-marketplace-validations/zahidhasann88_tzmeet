@@ -348,7 +348,6 @@ export const cronResultSchema = z
             "fold-once",
             "fold-first",
             "fold-second",
-            "fold-maybe-twice",
           ])
           .optional(),
         zones: z.array(cronZoneSchema),

@@ -25,7 +25,6 @@ export function defaultCronState(): CronState {
 export const isCronRoute = (hash: string) =>
   hash === CRON_ROUTE || hash.startsWith(`${CRON_ROUTE}?`);
 
-/** Reads `#/cron?e=…&d=…&z=…&show=…&n=…`; anything missing or invalid falls back to the default. */
 export function parseCronHash(hash: string): CronState {
   const state = defaultCronState();
   if (!isCronRoute(hash)) return state;
@@ -63,7 +62,6 @@ export function cronHash(state: CronState): string {
   return `${CRON_ROUTE}?${params}`;
 }
 
-/** Field labels for the tokens of an expression, matching the dialect's field order. */
 export function fieldLabels(tokens: number): string[] {
   if (tokens === 5)
     return ["minute", "hour", "day of month", "month", "day of week"];
@@ -76,4 +74,9 @@ export function fieldLabels(tokens: number): string[] {
     "day of week",
     "year",
   ].slice(0, tokens);
+}
+
+export function cronShareLink(state: CronState, href: string): string {
+  const page = new URL("cron/", href.split(/[?#]/)[0]);
+  return `${page.href}#${cronHash(state).split("?")[1]}`;
 }

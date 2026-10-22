@@ -14,7 +14,6 @@ const notes: Record<CronRunNote, string> = {
   "fold-once": "clocks repeat this time; runs only once",
   "fold-first": "clocks repeat this time; 1st of 2 runs",
   "fold-second": "clocks repeat this time; 2nd of 2 runs",
-  "fold-maybe-twice": "clocks repeat this time; may run again",
 };
 
 export function formatCron(result: CronExplanation): string {

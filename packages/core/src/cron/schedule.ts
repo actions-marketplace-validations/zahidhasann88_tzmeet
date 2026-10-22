@@ -15,7 +15,7 @@ import {
 } from "./parse.js";
 
 type GapPolicy = "skip" | "catch-up";
-type FoldPolicy = "once" | "twice" | "unconfirmed";
+type FoldPolicy = "once" | "twice";
 function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
   switch (cron.dialect) {
     case "unix":
@@ -24,8 +24,10 @@ function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
         : { gap: "skip", fold: "twice" };
     case "kubernetes":
       return { gap: "skip", fold: "twice" };
+    // Checked by running CronExpression.next() on Spring 6.2.19 and 7.0.10 (October
+    // 2026): a time in the repeated hour runs twice, a time in the skipped hour not at all.
     case "spring":
-      return { gap: "skip", fold: "unconfirmed" };
+      return { gap: "skip", fold: "twice" };
     case "quartz":
       return { gap: "skip", fold: "once" };
   }
@@ -65,8 +67,7 @@ export type CronRunNote =
   | "gap-catch-up"
   | "fold-once"
   | "fold-first"
-  | "fold-second"
-  | "fold-maybe-twice";
+  | "fold-second";
 export interface CronRunZone {
   zone: string;
   local: string;
@@ -83,7 +84,6 @@ export type CronWarningCode =
   | "dst-skip"
   | "dst-late"
   | "dst-double"
-  | "dst-maybe-double"
   | "dst-once"
   | "zone-shift"
   | "dom-dow-or"
@@ -332,8 +332,7 @@ export function explainCron(input: CronExplainInput): CronExplanation {
       if (rules.fold === "twice") {
         add(first, "fold-first");
         add(last, "fold-second");
-      } else
-        add(first, rules.fold === "once" ? "fold-once" : "fold-maybe-twice");
+      } else add(first, "fold-once");
     } else add(wall.instants[0]!);
     if (pending.length >= count && stopAt === Infinity)
       stopAt = rules.fold === "twice" ? match + 3 * hour : match;
@@ -409,13 +408,6 @@ export function explainCron(input: CronExplainInput): CronExplanation {
         severity: "warning",
         at,
         message: `${when}, clocks go back from ${shift}, so the ${runs} happen${several ? "" : "s"} twice.`,
-      });
-    else if (rules.fold === "unconfirmed")
-      warnings.push({
-        code: "dst-maybe-double",
-        severity: "warning",
-        at,
-        message: `${when}, clocks go back from ${shift}, so ${times} happens twice. ${name} doesn't document what it does then; it may run twice.`,
       });
     else
       warnings.push({

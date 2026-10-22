@@ -370,16 +370,35 @@ describe("DST: fall-back fold (New York, 1 Nov 2026, 02:00 → 01:00)", () => {
     ]);
   });
 
-  it("Quartz fires once; Spring may fire twice", () => {
+  it("Quartz fires once; Spring fires twice", () => {
     expect(runs("0 30 1 * * ?", "quartz", 1)).toEqual([
       ["2026-11-01T05:30:00.000Z", "fold-once"],
     ]);
-    expect(runs("0 30 1 * * *", "spring", 1)).toEqual([
-      ["2026-11-01T05:30:00.000Z", "fold-maybe-twice"],
+    expect(runs("0 30 1 * * *", "spring", 3)).toEqual([
+      ["2026-11-01T05:30:00.000Z", "fold-first"],
+      ["2026-11-01T06:30:00.000Z", "fold-second"],
+      ["2026-11-02T06:30:00.000Z", undefined],
     ]);
     expect(
       codes({ expression: "0 30 1 * * *", dialect: "spring", zone: NY, from }),
-    ).toContain("dst-maybe-double");
+    ).toContain("dst-double");
+  });
+
+  it("Spring repeats every hourly run in the repeated hour, like Spring itself", () => {
+    expect(
+      explainCron({
+        expression: "0 0 * * * *",
+        dialect: "spring",
+        zone: NY,
+        from: "2026-11-01T04:00:00Z",
+        count: 4,
+      }).runs.map((run) => run.utc),
+    ).toEqual([
+      "2026-11-01T05:00:00.000Z",
+      "2026-11-01T06:00:00.000Z",
+      "2026-11-01T07:00:00.000Z",
+      "2026-11-01T08:00:00.000Z",
+    ]);
   });
 
   it("finds a second occurrence after `from` even when `from` is inside the fold", () => {

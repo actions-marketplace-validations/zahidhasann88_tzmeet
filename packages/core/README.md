@@ -49,7 +49,7 @@ if (result.slots.length === 0) {
 | `quietBefore` / `quietAfter` (acceptable hours) | 08:00 / 21:00 |
 | `weekend` (ISO days, 1 = Mon) | `[6, 7]`, or `[5, 6]` in Fri/Sat countries |
 | `holidays` | `[]` (dates as YYYY-MM-DD) |
-| `holidayPreset` | off (`BD`, `GB-ENG` or `US`; see `presetHolidays(preset, year)`) |
+| `holidayPreset` | off (`BD`, `GB-ENG`, `IN`, `PK`, `AE` or `US`; see `presetHolidays(preset, year)` and `presetNote(preset, year)`) |
 | `busy` | `[]` (`{ start, end }` ISO instants; read them from an `.ics` file with `parseIcsBusy(text, { from, to, defaultZone })`) |
 | `specialHours` | `[]` (`{ label?, from, to, workStart, workEnd, quietBefore?, quietAfter? }`; `ramadanDates(year, preset?)` gives approximate Ramadan dates) |
 | `optional` | off (`true`: this zone never blocks a time; times it can attend rank higher) |

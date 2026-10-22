@@ -779,7 +779,7 @@ describe("holiday presets over HTTP", () => {
     expect(error.details).toEqual([
       {
         field: "holidayPreset",
-        message: 'Unknown holiday preset "FR"; use BD, GB-ENG, US or none',
+        message: 'Unknown holiday preset "FR"; use BD, GB-ENG, IN, PK, AE, US or none',
       },
     ]);
   });

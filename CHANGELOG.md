@@ -2,6 +2,19 @@
 
 Notable changes are recorded here. Package versions follow semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- Holiday presets for India (central government, Delhi: DoPT gazetted lists for 2026 and 2027), Pakistan and the UAE. `presetNote(preset, year)` says when a year's festival list isn't available.
+- Bangladesh's Hindu and Buddhist public holidays for 2026 (Buddha Purnima, Janmashtami, Durga Puja).
+- Imported calendars can be remembered on this device (browser storage only, never in share links).
+- Link previews: Open Graph tags and preview images for the site, and a `/cron/` page with its own preview. The cron explainer's "Copy link" now uses it.
+
+### Changed
+
+- Spring cron schedules now report that a time in the repeated DST hour runs twice, confirmed by running Spring 6.2.19 and 7.0.10. The `fold-maybe-twice` run note and `dst-maybe-double` warning code are removed.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added

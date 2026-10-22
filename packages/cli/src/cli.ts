@@ -83,7 +83,7 @@ export function runCLI(
     )
     .option(
       "--holiday-preset <IANA_ZONE=preset>",
-      "per-zone public holidays: BD, GB-ENG, US or none, e.g. Asia/Dhaka=BD; repeatable",
+      "per-zone public holidays: BD, GB-ENG, IN, PK, AE, US or none, e.g. Asia/Dhaka=BD; repeatable",
       collect,
     )
     .option(
