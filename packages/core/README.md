@@ -32,6 +32,8 @@ if (result.slots.length === 0) {
 - `validateInput(input)` – checks input and returns friendly error messages.
 - `listTimeZones(search?)` – lists time zone names.
 - `convertTime({ time, from, to })` – converts a local time to other zones.
+- `listTransitions(zone, from, to)` – daylight saving and other clock changes in a date range, each marked `gap` (clocks jump forward) or `fold` (clocks repeat).
+- `resolveLocal(zone, localDateTime)` – tells you whether a local time is `ok`, `skipped` (inside a gap) or `ambiguous` (happens twice), with the real instants.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 
