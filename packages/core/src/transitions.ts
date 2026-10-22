@@ -26,7 +26,7 @@ const hour = 3600000;
 const day = 24 * hour;
 const maxRangeYears = 10;
 
-function zoneOf(id: string): IANAZone {
+export function zoneOf(id: string): IANAZone {
   if (!timeZoneIdSchema.safeParse(id).success)
     throw new ScheduleInputError([
       { path: "zone", message: "Unknown IANA time zone", value: id },
@@ -53,6 +53,47 @@ function represent(id: string, millis: number): ResolvedInstant {
     offsetMinutes: local.offset,
   };
 }
+function locateChange(
+  tz: IANAZone,
+  low: number,
+  high: number,
+  offsetBefore: number,
+): number {
+  while (high - low > 1) {
+    const middle = Math.floor((low + high) / 2);
+    if (tz.offset(middle) === offsetBefore) low = middle;
+    else high = middle;
+  }
+  return high;
+}
+
+/** Instants for a civil time given as naive UTC millis; `change` is set when it falls in a gap. */
+export function resolveWall(
+  tz: IANAZone,
+  naive: number,
+): { instants: number[]; change?: number } {
+  const before = tz.offset(naive - day);
+  const after = tz.offset(naive + day);
+  const candidates = new Set([before, tz.offset(naive), after]);
+  const instants = [
+    ...new Set(
+      [...candidates]
+        .map((offset) => naive - offset * 60000)
+        .filter((millis) => tz.offset(millis) === (naive - millis) / 60000),
+    ),
+  ].sort((a, b) => a - b);
+  if (instants.length) return { instants };
+  return {
+    instants,
+    change: locateChange(
+      tz,
+      naive - after * 60000,
+      naive - before * 60000,
+      before,
+    ),
+  };
+}
+
 const wall = (millis: number, offset: number) =>
   DateTime.fromMillis(millis + offset * 60000, { zone: "UTC" }).toFormat(
     "yyyy-MM-dd'T'HH:mm:ss",
@@ -78,28 +119,30 @@ export function listTransitions(
         value: to,
       },
     ]);
-  const transitions: ZoneTransition[] = [];
+  return scanTransitions(tz, start, end).map(({ at, offsetBefore, offsetAfter }) => ({
+    at: DateTime.fromMillis(at, { zone: "UTC" }).toISO()!,
+    kind: offsetAfter > offsetBefore ? "gap" : "fold",
+    offsetBefore,
+    offsetAfter,
+    localBefore: wall(at, offsetBefore),
+    localAfter: wall(at, offsetAfter),
+  }));
+}
+
+/** Offset changes in [start, end) as millis; assumes changes are more than a day apart. */
+export function scanTransitions(
+  tz: IANAZone,
+  start: number,
+  end: number,
+): { at: number; offsetBefore: number; offsetAfter: number }[] {
+  const transitions: { at: number; offsetBefore: number; offsetAfter: number }[] = [];
   for (let cursor = start - 1; cursor < end; cursor += day) {
     const next = Math.min(cursor + day, end);
     const offsetBefore = tz.offset(cursor);
     if (tz.offset(next) === offsetBefore) continue;
-    let low = cursor;
-    let high = next;
-    while (high - low > 1) {
-      const middle = Math.floor((low + high) / 2);
-      if (tz.offset(middle) === offsetBefore) low = middle;
-      else high = middle;
-    }
-    if (high >= end) break;
-    const offsetAfter = tz.offset(high);
-    transitions.push({
-      at: DateTime.fromMillis(high, { zone: "UTC" }).toISO()!,
-      kind: offsetAfter > offsetBefore ? "gap" : "fold",
-      offsetBefore,
-      offsetAfter,
-      localBefore: wall(high, offsetBefore),
-      localAfter: wall(high, offsetAfter),
-    });
+    const at = locateChange(tz, cursor, next, offsetBefore);
+    if (at >= end) break;
+    transitions.push({ at, offsetBefore, offsetAfter: tz.offset(at) });
   }
   return transitions;
 }
@@ -123,17 +166,9 @@ export function resolveLocal(
   const civil = DateTime.fromISO(localDateTime, { zone: "UTC" });
   if (!civil.isValid) fail();
   const naive = civil.toMillis();
-  const candidates = new Set([
-    tz.offset(naive - day),
-    tz.offset(naive),
-    tz.offset(naive + day),
-  ]);
-  const matches = [...candidates]
-    .map((offset) => naive - offset * 60000)
-    .filter((millis) => tz.offset(millis) === (naive - millis) / 60000);
-  const instants = [...new Set(matches)]
-    .sort((a, b) => a - b)
-    .map((millis) => represent(zone, millis));
+  const instants = resolveWall(tz, naive).instants.map((millis) =>
+    represent(zone, millis),
+  );
   if (instants.length === 2)
     return { status: "ambiguous", instants: [instants[0]!, instants[1]!] };
   if (instants.length === 1) return { status: "ok", instants: [instants[0]!] };

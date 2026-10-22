@@ -34,6 +34,8 @@ if (result.slots.length === 0) {
 - `convertTime({ time, from, to })` – converts a local time to other zones.
 - `listTransitions(zone, from, to)` – daylight saving and other clock changes in a date range, each marked `gap` (clocks jump forward) or `fold` (clocks repeat).
 - `resolveLocal(zone, localDateTime)` – tells you whether a local time is `ok`, `skipped` (inside a gap) or `ambiguous` (happens twice), with the real instants.
+- `explainCron({ expression, from, zone?, dialect?, count?, displayZones? })` – explains a Unix, Kubernetes, Spring or Quartz cron expression in plain English, lists its next runs in any zones, and warns about runs that daylight saving skips or repeats. Each engine's own DST behaviour is applied.
+- `parseCron(expression, dialect?)` – checks a cron expression and returns field-by-field errors.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 

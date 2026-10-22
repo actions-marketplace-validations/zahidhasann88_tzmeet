@@ -58,6 +58,25 @@ export type {
   TimeZoneInfo,
 } from "./time-transport.js";
 export { listTransitions, resolveLocal } from "./transitions.js";
+export { parseCron, detectDialect, cronDialects, cronDialectName } from "./cron/parse.js";
+export type {
+  CronDialect,
+  CronFieldName,
+  CronIssue,
+  CronParseResult,
+  ParsedCron,
+} from "./cron/parse.js";
+export { describeCron } from "./cron/describe.js";
+export { explainCron, cronExplainSchema } from "./cron/schedule.js";
+export type {
+  CronExplainInput,
+  CronExplanation,
+  CronRun,
+  CronRunNote,
+  CronRunZone,
+  CronWarning,
+  CronWarningCode,
+} from "./cron/schedule.js";
 export type {
   ZoneTransition,
   ResolvedInstant,
