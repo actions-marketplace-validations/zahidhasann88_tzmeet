@@ -1,6 +1,6 @@
 {
   "name": "@tzmeet/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Browser-safe meeting slot search with time-zone and prayer constraints",
   "license": "MIT",
   "homepage": "https://github.com/zahidhasann88/tzmeet/tree/main/packages/core#readme",

@@ -49,7 +49,7 @@ exports[`stateless JSON routes (in-process app.request only) > GET shares the CL
   "meta": {
     "count": 2,
     "generatedAt": "2026-10-14T12:00:00.000Z",
-    "version": "0.2.0",
+    "version": "0.3.0",
   },
   "slots": [
     {
@@ -161,7 +161,7 @@ exports[`stateless JSON routes (in-process app.request only) > POST is exactly c
   "meta": {
     "count": 2,
     "generatedAt": "2026-10-14T12:00:00.000Z",
-    "version": "0.2.0",
+    "version": "0.3.0",
   },
   "slots": [
     {
@@ -245,7 +245,7 @@ exports[`stateless JSON routes (in-process app.request only) > POST is exactly c
 exports[`stateless JSON routes (in-process app.request only) > returns fixed-clock health and zones snapshots 1`] = `
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "0.3.0",
 }
 `;
 
@@ -325,7 +325,7 @@ exports[`stateless JSON routes (in-process app.request only) > treats no availab
   "meta": {
     "count": 0,
     "generatedAt": "2026-10-14T12:00:00.000Z",
-    "version": "0.2.0",
+    "version": "0.3.0",
   },
   "slots": [],
 }

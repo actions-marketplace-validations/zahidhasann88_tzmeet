@@ -2,7 +2,7 @@
 
 Notable changes are recorded here. Package versions follow semantic versioning.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-22
 
 ### Added
 

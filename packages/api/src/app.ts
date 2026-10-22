@@ -49,7 +49,7 @@ import {
   zonesQuerySchema,
 } from "./schemas.js";
 
-export const API_VERSION = "0.2.0";
+export const API_VERSION = "0.3.0";
 /** Platform-neutral dependencies; injected clocks make app.request() tests deterministic. */
 export type { AppOptions, LogEntry } from "./security.js";
 export { optionsFromEnv } from "./security.js";
