@@ -13,11 +13,13 @@ import {
   explainCron,
   convertCronDialect,
   convertCronZone,
+  parseNaturalCron,
   findSlots,
   getTimeZoneInfo,
   listTimeZones,
   parseScheduleInput,
   recurringImpact,
+  recurringCalendarText,
   fairRotation,
   validateInput,
   ScheduleInputError,
@@ -41,6 +43,8 @@ import {
   cronQuerySchema,
   cronConvertQuerySchema,
   cronConvertResultSchema,
+  cronNaturalQuerySchema,
+  cronNaturalResultSchema,
   cronResultSchema,
   errorSchema,
   recurringQuerySchema,
@@ -234,6 +238,22 @@ const getCronConvert = createRoute({
     ...errorResponses,
   },
 });
+const getCronNatural = createRoute({
+  method: "get",
+  path: "/v1/cron/natural",
+  tags: ["Cron"],
+  summary:
+    'Turn plain English ("every weekday at 9am Dhaka") into a cron expression',
+  request: { query: cronNaturalQuerySchema },
+  responses: {
+    200: {
+      description:
+        "The expression(s), the time zone named in the text, a plain-English check and the scheduler's time-zone setting; problems explain anything that couldn't be translated",
+      content: json(cronNaturalResultSchema),
+    },
+    ...errorResponses,
+  },
+});
 const getRecurring = createRoute({
   method: "get",
   path: "/v1/recurring",
@@ -244,8 +264,14 @@ const getRecurring = createRoute({
   responses: {
     200: {
       description:
-        "Every occurrence, periods of unchanged local times with their causes, and warnings",
-      content: json(recurringResultSchema),
+        "Every occurrence, periods of unchanged local times with their causes, and warnings; or the weekly series as .ics",
+      content: {
+        ...json(recurringResultSchema),
+        "text/calendar": {
+          schema: z.string(),
+          example: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n",
+        },
+      },
     },
     ...errorResponses,
   },
@@ -266,6 +292,7 @@ const methods: Record<string, readonly string[]> = {
   "/v1/convert": ["GET", "HEAD"],
   "/v1/cron": ["GET", "HEAD"],
   "/v1/cron/convert": ["GET", "HEAD"],
+  "/v1/cron/natural": ["GET", "HEAD"],
   "/v1/recurring": ["GET", "HEAD"],
   "/v1/health": ["GET", "HEAD"],
   "/openapi.json": ["GET", "HEAD"],
@@ -375,7 +402,6 @@ export function createApp(options: AppOptions = {}) {
       response: {
         slots: selected,
         diagnostics: result.diagnostics,
-        // The rotation looks at every slot found, not only the returned `top`.
         ...(rotation
           ? {
               rotation: fairRotation(result, {
@@ -521,8 +547,14 @@ export function createApp(options: AppOptions = {}) {
       200,
     );
   });
+  app.openapi(getCronNatural, (c) => {
+    const { text, dialect } = c.req.valid("query");
+    if (!options.apiKeys?.length)
+      c.header("Cache-Control", "public, max-age=3600");
+    return c.json(parseNaturalCron(text, dialect ? { dialect } : {}), 200);
+  });
   app.openapi(getRecurring, (c) => {
-    const { time, weeks, ...query } = c.req.valid("query");
+    const { time, weeks, format, ...query } = c.req.valid("query");
     const input = parseScheduleInput({
       ...query,
       zoneWork: array(query.zoneWork),
@@ -535,17 +567,26 @@ export function createApp(options: AppOptions = {}) {
     });
     if (!options.apiKeys?.length)
       c.header("Cache-Control", "public, max-age=300");
-    return c.json(
-      recurringImpact({
-        zones: input.zones,
-        startDate: input.startDate,
-        durationMinutes: input.durationMinutes,
-        ...(input.prayer ? { prayer: input.prayer } : {}),
-        time,
-        weeks,
-      }),
-      200,
-    );
+    const impact = recurringImpact({
+      zones: input.zones,
+      startDate: input.startDate,
+      durationMinutes: input.durationMinutes,
+      ...(input.prayer ? { prayer: input.prayer } : {}),
+      time,
+      weeks,
+    });
+    if (format === "ics") {
+      c.header(
+        "Content-Disposition",
+        `attachment; filename="tzmeet-weekly-${impact.occurrences[0]!.date}.ics"`,
+      );
+      return c.text(
+        recurringCalendarText(impact, { created: now().toISOString() }),
+        200,
+        { "Content-Type": "text/calendar; charset=utf-8" },
+      );
+    }
+    return c.json(impact, 200);
   });
   app.openapi(getHealth, (c) => {
     c.header("Cache-Control", "public, max-age=30");
@@ -636,6 +677,7 @@ export function createApp(options: AppOptions = {}) {
       ["/v1/convert", "convert"],
       ["/v1/cron", "cron"],
       ["/v1/cron/convert", "cronConvert"],
+      ["/v1/cron/natural", "cronNatural"],
       ["/v1/recurring", "recurring"],
       ["/v1/health", "health"],
     ] as const) {

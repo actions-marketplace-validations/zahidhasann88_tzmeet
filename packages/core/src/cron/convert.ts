@@ -56,7 +56,7 @@ function parse(expression: string, dialect?: CronDialect): ParsedCron {
   return parsed.cron;
 }
 
-function compact(
+export function compact(
   values: Iterable<number>,
   min: number,
   max: number,
@@ -422,7 +422,7 @@ function shiftedExpressions(
   };
 }
 
-function nativeSetting(
+export function nativeSetting(
   dialect: CronDialect,
   expression: string,
   zone: string,

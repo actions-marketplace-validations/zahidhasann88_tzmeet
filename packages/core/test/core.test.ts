@@ -1,315 +1,643 @@
-import { describe, expect, it } from 'vitest';
-import { DateTime } from 'luxon';
-import { classifySpan, configSchema, defaultWeekend, findSlots, getPrayerWindows, InputValidationError, listTimeZones, validateInput, type ZoneRule } from '../src/index.js';
+import { describe, expect, it } from "vitest";
+import { DateTime } from "luxon";
+import {
+  classifySpan,
+  configSchema,
+  defaultWeekend,
+  findSlots,
+  getPrayerWindows,
+  InputValidationError,
+  listTimeZones,
+  validateInput,
+  type ZoneRule,
+} from "../src/index.js";
 
 const trio: ZoneRule[] = [
-  { id: 'Asia/Dhaka', label: 'Dhaka', weekend: [5, 6], quietBefore: '00:00', quietAfter: '23:59' },
-  { id: 'America/New_York', label: 'New York', quietBefore: '00:00', quietAfter: '23:59' },
-  { id: 'Europe/London', label: 'London', quietBefore: '00:00', quietAfter: '23:59' }
+  {
+    id: "Asia/Dhaka",
+    label: "Dhaka",
+    weekend: [5, 6],
+    quietBefore: "00:00",
+    quietAfter: "23:59",
+  },
+  {
+    id: "America/New_York",
+    label: "New York",
+    quietBefore: "00:00",
+    quietAfter: "23:59",
+  },
+  {
+    id: "Europe/London",
+    label: "London",
+    quietBefore: "00:00",
+    quietAfter: "23:59",
+  },
 ];
-const openNY: ZoneRule = { id: 'America/New_York', weekend: [], workStart: '00:00', workEnd: '23:59', quietBefore: '00:00', quietAfter: '23:59' };
-const utcRule: ZoneRule = { id: 'UTC', weekend: [] };
+const openNY: ZoneRule = {
+  id: "America/New_York",
+  weekend: [],
+  workStart: "00:00",
+  workEnd: "23:59",
+  quietBefore: "00:00",
+  quietAfter: "23:59",
+};
+const utcRule: ZoneRule = { id: "UTC", weekend: [] };
 const at = (value: string) => DateTime.fromISO(value, { setZone: true });
 
 function fixedSlot(date: string, utcHour = 12) {
-  const result = findSlots({ zones: trio, startDate: date, days: 1, stepMinutes: 60 });
-  const slot = result.slots.find(slot => at(slot.start).hour === utcHour);
+  const result = findSlots({
+    zones: trio,
+    startDate: date,
+    days: 1,
+    stepMinutes: 60,
+  });
+  const slot = result.slots.find((slot) => at(slot.start).hour === utcHour);
   expect(slot, `No ${utcHour}:00Z slot on ${date}`).toBeDefined();
   return slot!;
 }
 
-describe('DST across Dhaka, New York and London', () => {
+describe("DST across Dhaka, New York and London", () => {
   it.each([
-    ['2026-03-02', -300, 0, '07:00', '12:00'],
-    ['2026-03-16', -240, 0, '08:00', '12:00'],
-    ['2026-03-30', -240, 60, '08:00', '13:00'],
-    ['2026-10-19', -240, 60, '08:00', '13:00'],
-    ['2026-10-26', -240, 0, '08:00', '12:00'],
-    ['2026-11-02', -300, 0, '07:00', '12:00']
-  ])('%s has the correct independent offsets', (date, nyOffset, londonOffset, nyTime, londonTime) => {
-    const slot = fixedSlot(date);
-    const [dhaka, ny, london] = slot.zones;
-    expect(at(dhaka!.localStart).offset).toBe(360);
-    expect(at(dhaka!.localStart).toFormat('HH:mm')).toBe('18:00');
-    expect(at(ny!.localStart).offset).toBe(nyOffset);
-    expect(at(ny!.localStart).toFormat('HH:mm')).toBe(nyTime);
-    expect(at(london!.localStart).offset).toBe(londonOffset);
-    expect(at(london!.localStart).toFormat('HH:mm')).toBe(londonTime);
+    ["2026-03-02", -300, 0, "07:00", "12:00"],
+    ["2026-03-16", -240, 0, "08:00", "12:00"],
+    ["2026-03-30", -240, 60, "08:00", "13:00"],
+    ["2026-10-19", -240, 60, "08:00", "13:00"],
+    ["2026-10-26", -240, 0, "08:00", "12:00"],
+    ["2026-11-02", -300, 0, "07:00", "12:00"],
+  ])(
+    "%s has the correct independent offsets",
+    (date, nyOffset, londonOffset, nyTime, londonTime) => {
+      const slot = fixedSlot(date);
+      const [dhaka, ny, london] = slot.zones;
+      expect(at(dhaka!.localStart).offset).toBe(360);
+      expect(at(dhaka!.localStart).toFormat("HH:mm")).toBe("18:00");
+      expect(at(ny!.localStart).offset).toBe(nyOffset);
+      expect(at(ny!.localStart).toFormat("HH:mm")).toBe(nyTime);
+      expect(at(london!.localStart).offset).toBe(londonOffset);
+      expect(at(london!.localStart).toFormat("HH:mm")).toBe(londonTime);
+    },
+  );
+
+  it("skips nonexistent spring-forward wall times by scanning real UTC instants", () => {
+    const result = findSlots({
+      zones: [openNY],
+      startDate: "2026-03-08",
+      days: 1,
+      stepMinutes: 30,
+    });
+    const starts = result.slots.map((slot) => slot.zones[0]!.localStart);
+    expect(starts.some((start) => start.includes("T02:"))).toBe(false);
+    expect(starts.some((start) => start.includes("T03:00:00.000-04:00"))).toBe(
+      true,
+    );
+    const crossing = result.slots.find((slot) =>
+      slot.start.startsWith("2026-03-08T06:30"),
+    )!;
+    expect(crossing.zones[0]!.localStart).toContain("01:30:00.000-05:00");
+    expect(crossing.zones[0]!.localEnd).toContain("03:00:00.000-04:00");
+    expect(at(crossing.end).diff(at(crossing.start), "minutes").minutes).toBe(
+      30,
+    );
   });
 
-  it('skips nonexistent spring-forward wall times by scanning real UTC instants', () => {
-    const result = findSlots({ zones: [openNY], startDate: '2026-03-08', days: 1, stepMinutes: 30 });
-    const starts = result.slots.map(slot => slot.zones[0]!.localStart);
-    expect(starts.some(start => start.includes('T02:'))).toBe(false);
-    expect(starts.some(start => start.includes('T03:00:00.000-04:00'))).toBe(true);
-    const crossing = result.slots.find(slot => slot.start.startsWith('2026-03-08T06:30'))!;
-    expect(crossing.zones[0]!.localStart).toContain('01:30:00.000-05:00');
-    expect(crossing.zones[0]!.localEnd).toContain('03:00:00.000-04:00');
-    expect(at(crossing.end).diff(at(crossing.start), 'minutes').minutes).toBe(30);
-  });
-
-  it('preserves both repeated autumn hours with distinct offsets', () => {
-    const result = findSlots({ zones: [openNY], startDate: '2026-11-01', days: 1, stepMinutes: 30 });
-    const repeated = result.slots.filter(slot => at(slot.zones[0]!.localStart).toFormat('HH:mm') === '01:30');
+  it("preserves both repeated autumn hours with distinct offsets", () => {
+    const result = findSlots({
+      zones: [openNY],
+      startDate: "2026-11-01",
+      days: 1,
+      stepMinutes: 30,
+    });
+    const repeated = result.slots.filter(
+      (slot) => at(slot.zones[0]!.localStart).toFormat("HH:mm") === "01:30",
+    );
     expect(repeated).toHaveLength(2);
-    expect(new Set(repeated.map(slot => at(slot.zones[0]!.localStart).offset))).toEqual(new Set([-240, -300]));
+    expect(
+      new Set(repeated.map((slot) => at(slot.zones[0]!.localStart).offset)),
+    ).toEqual(new Set([-240, -300]));
   });
 
-  it('catches a hidden boundary inside the fall-back fold, not only endpoints', () => {
-    const rule: ZoneRule = { ...openNY, workStart: '01:30', workEnd: '04:00', quietBefore: '01:15' };
-    // Endpoints are 01:45 EDT and 01:45 EST, but the span passes 01:00 EST.
-    expect(classifySpan(rule, '2026-11-01T05:45:00Z', '2026-11-01T06:45:00Z').constraints).toContain('quiet');
+  it("catches a hidden boundary inside the fall-back fold, not only endpoints", () => {
+    const rule: ZoneRule = {
+      ...openNY,
+      workStart: "01:30",
+      workEnd: "04:00",
+      quietBefore: "01:15",
+    };
+    expect(
+      classifySpan(rule, "2026-11-01T05:45:00Z", "2026-11-01T06:45:00Z")
+        .constraints,
+    ).toContain("quiet");
   });
 
-  it('handles non-hour DST changes (Lord Howe shifts by 30 minutes)', () => {
-    const zone: ZoneRule = { ...openNY, id: 'Australia/Lord_Howe' };
-    const result = findSlots({ zones: [zone], startDate: '2026-10-04', days: 1, stepMinutes: 15 });
-    expect(at(result.range.end).diff(at(result.range.start), 'hours').hours).toBe(23.5);
-    expect(result.slots.some(slot => at(slot.zones[0]!.localStart).toFormat('HH:mm') === '02:15')).toBe(false);
+  it("handles non-hour DST changes (Lord Howe shifts by 30 minutes)", () => {
+    const zone: ZoneRule = { ...openNY, id: "Australia/Lord_Howe" };
+    const result = findSlots({
+      zones: [zone],
+      startDate: "2026-10-04",
+      days: 1,
+      stepMinutes: 15,
+    });
+    expect(
+      at(result.range.end).diff(at(result.range.start), "hours").hours,
+    ).toBe(23.5);
+    expect(
+      result.slots.some(
+        (slot) => at(slot.zones[0]!.localStart).toFormat("HH:mm") === "02:15",
+      ),
+    ).toBe(false);
   });
 });
 
-describe('whole-span work, quiet and weekend rules', () => {
-  it('combines Friday/Saturday in Dhaka with Saturday/Sunday elsewhere', () => {
-    const result = findSlots({ zones: trio, startDate: '2026-11-02', days: 7, stepMinutes: 60 });
+describe("whole-span work, quiet and weekend rules", () => {
+  it("combines Friday/Saturday in Dhaka with Saturday/Sunday elsewhere", () => {
+    const result = findSlots({
+      zones: trio,
+      startDate: "2026-11-02",
+      days: 7,
+      stepMinutes: 60,
+    });
     expect(result.slots.length).toBeGreaterThan(0);
     for (const slot of result.slots) {
       for (const zone of slot.zones) {
-        const weekends = zone.id === 'Asia/Dhaka' ? [5, 6] : [6, 7];
+        const weekends = zone.id === "Asia/Dhaka" ? [5, 6] : [6, 7];
         expect(weekends).not.toContain(at(zone.localStart).weekday);
         expect(weekends).not.toContain(at(zone.localEnd).weekday);
       }
     }
-    expect(result.slots.some(slot => at(slot.zones[0]!.localStart).weekday === 5)).toBe(false);
+    expect(
+      result.slots.some((slot) => at(slot.zones[0]!.localStart).weekday === 5),
+    ).toBe(false);
   });
 
-  it('treats a work-boundary crossing as acceptable, but an exact end as ideal', () => {
-    expect(classifySpan(utcRule, '2026-11-02T17:45:00Z', '2026-11-02T18:15:00Z').classification).toBe('acceptable');
-    expect(classifySpan(utcRule, '2026-11-02T17:30:00Z', '2026-11-02T18:00:00Z').classification).toBe('ideal');
-    expect(classifySpan(utcRule, '2026-11-02T08:45:00Z', '2026-11-02T09:15:00Z').classification).toBe('acceptable');
+  it("treats a work-boundary crossing as acceptable, but an exact end as ideal", () => {
+    expect(
+      classifySpan(utcRule, "2026-11-02T17:45:00Z", "2026-11-02T18:15:00Z")
+        .classification,
+    ).toBe("acceptable");
+    expect(
+      classifySpan(utcRule, "2026-11-02T17:30:00Z", "2026-11-02T18:00:00Z")
+        .classification,
+    ).toBe("ideal");
+    expect(
+      classifySpan(utcRule, "2026-11-02T08:45:00Z", "2026-11-02T09:15:00Z")
+        .classification,
+    ).toBe("acceptable");
   });
 
-  it('allows an exact quiet endpoint, blocks a span extending past it', () => {
-    expect(classifySpan(utcRule, '2026-11-02T20:30:00Z', '2026-11-02T21:00:00Z').classification).toBe('acceptable');
-    expect(classifySpan(utcRule, '2026-11-02T20:45:00Z', '2026-11-02T21:15:00Z').constraints).toContain('quiet');
+  it("allows an exact quiet endpoint, blocks a span extending past it", () => {
+    expect(
+      classifySpan(utcRule, "2026-11-02T20:30:00Z", "2026-11-02T21:00:00Z")
+        .classification,
+    ).toBe("acceptable");
+    expect(
+      classifySpan(utcRule, "2026-11-02T20:45:00Z", "2026-11-02T21:15:00Z")
+        .constraints,
+    ).toContain("quiet");
   });
 
-  it('checks midnight and the next local weekday, including the end instant', () => {
-    const rule: ZoneRule = { id: 'UTC', workStart: '00:00', workEnd: '23:59', quietBefore: '00:00', quietAfter: '23:59', weekend: [6, 7] };
-    const crossing = classifySpan(rule, '2026-11-06T23:45:00Z', '2026-11-07T00:15:00Z');
-    expect(crossing.constraints).toEqual(expect.arrayContaining(['weekend', 'quiet']));
-    expect(classifySpan(rule, '2026-11-06T23:30:00Z', '2026-11-07T00:00:00Z').constraints).toContain('weekend');
+  it("checks midnight and the next local weekday, including the end instant", () => {
+    const rule: ZoneRule = {
+      id: "UTC",
+      workStart: "00:00",
+      workEnd: "23:59",
+      quietBefore: "00:00",
+      quietAfter: "23:59",
+      weekend: [6, 7],
+    };
+    const crossing = classifySpan(
+      rule,
+      "2026-11-06T23:45:00Z",
+      "2026-11-07T00:15:00Z",
+    );
+    expect(crossing.constraints).toEqual(
+      expect.arrayContaining(["weekend", "quiet"]),
+    );
+    expect(
+      classifySpan(rule, "2026-11-06T23:30:00Z", "2026-11-07T00:00:00Z")
+        .constraints,
+    ).toContain("weekend");
   });
 
-  it('does not return meetings extending beyond the searched range', () => {
-    const result = findSlots({ zones: [utcRule], startDate: '2026-11-02', days: 1, durationMinutes: 1440 });
+  it("does not return meetings extending beyond the searched range", () => {
+    const result = findSlots({
+      zones: [utcRule],
+      startDate: "2026-11-02",
+      days: 1,
+      durationMinutes: 1440,
+    });
     expect(result.slots).toEqual([]);
     expect(result.diagnostics.scannedCandidates).toBe(1);
   });
 
-  it('returns an empty list with actionable quiet-hour diagnostics', () => {
-    const result = findSlots({ zones: [
-      { id: 'Asia/Dhaka', quietBefore: '09:00', quietAfter: '18:00', weekend: [5, 6] },
-      { id: 'America/New_York', quietBefore: '09:00', quietAfter: '18:00' }
-    ], startDate: '2026-11-02', days: 4 });
+  it("returns an empty list with actionable quiet-hour diagnostics", () => {
+    const result = findSlots({
+      zones: [
+        {
+          id: "Asia/Dhaka",
+          quietBefore: "09:00",
+          quietAfter: "18:00",
+          weekend: [5, 6],
+        },
+        { id: "America/New_York", quietBefore: "09:00", quietAfter: "18:00" },
+      ],
+      startDate: "2026-11-02",
+      days: 4,
+    });
     expect(result.slots).toEqual([]);
-    expect(result.diagnostics.mostRestrictive?.constraint).toBe('quiet');
-    expect(result.diagnostics.message).toContain('Friday/Saturday weekend in Dhaka');
-    expect(result.diagnostics.message).toContain('Monday, Tuesday, Wednesday, Thursday');
+    expect(result.diagnostics.mostRestrictive?.constraint).toBe("quiet");
+    expect(result.diagnostics.message).toContain(
+      "Friday/Saturday weekend in Dhaka",
+    );
+    expect(result.diagnostics.message).toContain(
+      "Monday, Tuesday, Wednesday, Thursday",
+    );
     expect(result.diagnostics.suggestion).toMatch(/Relax.*cutoff/);
-    expect(result.diagnostics.rejectedCandidates).toBe(result.diagnostics.scannedCandidates);
+    expect(result.diagnostics.rejectedCandidates).toBe(
+      result.diagnostics.scannedCandidates,
+    );
   });
 
-  it('reports weekend as the dominant rejection when all weekdays are blocked', () => {
-    const result = findSlots({ zones: [{ ...openNY, weekend: [1, 2, 3, 4, 5, 6, 7] }], startDate: '2026-11-02', days: 1 });
-    expect(result.diagnostics.mostRestrictive?.constraint).toBe('weekend');
-    expect(result.diagnostics.suggestion).toContain('different week');
+  it("reports weekend as the dominant rejection when all weekdays are blocked", () => {
+    const result = findSlots({
+      zones: [{ ...openNY, weekend: [1, 2, 3, 4, 5, 6, 7] }],
+      startDate: "2026-11-02",
+      days: 1,
+    });
+    expect(result.diagnostics.mostRestrictive?.constraint).toBe("weekend");
+    expect(result.diagnostics.suggestion).toContain("different week");
   });
 });
 
-describe('prayer calculations and overlap', () => {
-  const prayer = { location: 'Dhaka' as const, method: 'Karachi' as const, bufferMinutes: 10 };
-  const dhaka: ZoneRule = { id: 'Asia/Dhaka', weekend: [5, 6] };
+describe("prayer calculations and overlap", () => {
+  const prayer = {
+    location: "Dhaka" as const,
+    method: "Karachi" as const,
+    bufferMinutes: 10,
+  };
+  const dhaka: ZoneRule = { id: "Asia/Dhaka", weekend: [5, 6] };
 
-  it('snapshots fixed-date Karachi calculations for Dhaka', () => {
-    expect(getPrayerWindows('2026-11-02', prayer)).toMatchSnapshot();
+  it("snapshots fixed-date Karachi calculations for Dhaka", () => {
+    expect(getPrayerWindows("2026-11-02", prayer)).toMatchSnapshot();
   });
 
-  it.each(['dhuhr', 'asr'])('blocks %s plus the symmetric buffer', name => {
-    const window = getPrayerWindows('2026-11-02', prayer).find(window => window.name === name)!;
+  it.each(["dhuhr", "asr"])("blocks %s plus the symmetric buffer", (name) => {
+    const window = getPrayerWindows("2026-11-02", prayer).find(
+      (window) => window.name === name,
+    )!;
     const start = at(window.start).minus({ minutes: 5 }).toISO()!;
     const end = at(start).plus({ minutes: 15 }).toISO()!;
-    expect(classifySpan(dhaka, start, end).classification).toBe('ideal');
+    expect(classifySpan(dhaka, start, end).classification).toBe("ideal");
     const blocked = classifySpan(dhaka, start, end, prayer);
-    expect(blocked.classification).toBe('blocked');
+    expect(blocked.classification).toBe("blocked");
     expect(blocked.prayers).toContain(name);
-    // Ending exactly at the buffered boundary counts as overlap.
-    expect(classifySpan(dhaka, at(window.start).minus({ minutes: 30 }).toISO()!, window.start, prayer).classification).toBe('blocked');
-    expect(classifySpan(dhaka, at(window.end).plus({ minutes: 1 }).toISO()!, at(window.end).plus({ minutes: 16 }).toISO()!, prayer).classification).toBe('ideal');
+    expect(
+      classifySpan(
+        dhaka,
+        at(window.start).minus({ minutes: 30 }).toISO()!,
+        window.start,
+        prayer,
+      ).classification,
+    ).toBe("blocked");
+    expect(
+      classifySpan(
+        dhaka,
+        at(window.end).plus({ minutes: 1 }).toISO()!,
+        at(window.end).plus({ minutes: 16 }).toISO()!,
+        prayer,
+      ).classification,
+    ).toBe("ideal");
   });
 
-  it('filters prayer-conflicting candidates and preserves all others', () => {
-    const input = { zones: [dhaka], startDate: '2026-11-02', days: 1, stepMinutes: 15 };
+  it("filters prayer-conflicting candidates and preserves all others", () => {
+    const input = {
+      zones: [dhaka],
+      startDate: "2026-11-02",
+      days: 1,
+      stepMinutes: 15,
+    };
     const before = findSlots(input);
     const after = findSlots({ ...input, prayer });
     expect(after.slots.length).toBeLessThan(before.slots.length);
-    for (const slot of after.slots) expect(classifySpan(dhaka, slot.start, slot.end, prayer).classification).not.toBe('blocked');
-    expect(after.diagnostics.constraints.some(count => count.constraint === 'prayer')).toBe(true);
+    for (const slot of after.slots)
+      expect(
+        classifySpan(dhaka, slot.start, slot.end, prayer).classification,
+      ).not.toBe("blocked");
+    expect(
+      after.diagnostics.constraints.some(
+        (count) => count.constraint === "prayer",
+      ),
+    ).toBe(true);
   });
 
-  it('supports per-zone location/method overrides', () => {
-    const window = getPrayerWindows('2026-11-02', prayer).find(window => window.name === 'dhuhr')!;
-    expect(classifySpan({ ...dhaka, prayer }, window.start, window.end).constraints).toContain('prayer');
+  it("supports per-zone location/method overrides", () => {
+    const window = getPrayerWindows("2026-11-02", prayer).find(
+      (window) => window.name === "dhuhr",
+    )!;
+    expect(
+      classifySpan({ ...dhaka, prayer }, window.start, window.end).constraints,
+    ).toContain("prayer");
   });
 
-  it('accepts coordinates and the MWL alias', () => {
-    expect(getPrayerWindows('2026-11-02', { location: { lat: 23.8103, lng: 90.4125 }, method: 'MWL' })).toHaveLength(5);
+  it("accepts coordinates and the MWL alias", () => {
+    expect(
+      getPrayerWindows("2026-11-02", {
+        location: { lat: 23.8103, lng: 90.4125 },
+        method: "MWL",
+      }),
+    ).toHaveLength(5);
   });
 });
 
-describe('ranking and output', () => {
-  it('ranks descending, never lets a tie-break outweigh one classification point', () => {
-    const result = findSlots({ zones: [{ id: 'Asia/Dhaka', weekend: [5, 6] }], startDate: '2026-11-02', days: 2 });
+describe("ranking and output", () => {
+  it("ranks descending, never lets a tie-break outweigh one classification point", () => {
+    const result = findSlots({
+      zones: [{ id: "Asia/Dhaka", weekend: [5, 6] }],
+      startDate: "2026-11-02",
+      days: 2,
+    });
     expect(result.slots.length).toBeGreaterThan(0);
     result.slots.forEach((slot, i) => {
       expect(slot.score - slot.baseScore).toBeGreaterThanOrEqual(0);
       expect(slot.score - slot.baseScore).toBeLessThan(0.1);
-      if (i > 0) expect(result.slots[i - 1]!.score).toBeGreaterThanOrEqual(slot.score);
-      expect(slot.zones[0]!.formattedStart).toContain('2026');
+      if (i > 0)
+        expect(result.slots[i - 1]!.score).toBeGreaterThanOrEqual(slot.score);
+      expect(slot.zones[0]!.formattedStart).toContain("2026");
       expect(slot.reason).toMatch(/Ideal|acceptable/);
     });
-    const ideal = result.slots.filter(slot => slot.baseScore === 2);
-    expect(ideal[0]!.date).toBe('2026-11-02');
-    expect(at(ideal[0]!.zones[0]!.localStart).toFormat('HH:mm')).toBe('13:15');
+    const ideal = result.slots.filter((slot) => slot.baseScore === 2);
+    expect(ideal[0]!.date).toBe("2026-11-02");
+    expect(at(ideal[0]!.zones[0]!.localStart).toFormat("HH:mm")).toBe("13:15");
   });
 
-  it('is deterministic and does not mutate inputs', () => {
-    const input = { zones: [{ id: 'Asia/Dhaka' }], startDate: '2026-11-02', days: 1 };
+  it("is deterministic and does not mutate inputs", () => {
+    const input = {
+      zones: [{ id: "Asia/Dhaka" }],
+      startDate: "2026-11-02",
+      days: 1,
+    };
     const original = structuredClone(input);
     expect(findSlots(input)).toEqual(findSlots(input));
     expect(input).toEqual(original);
   });
 
-  it('fits the range to first-zone calendar days across DST', () => {
-    const result = findSlots({ zones: [openNY], startDate: '2026-11-01', days: 1 });
-    expect(at(result.range.end).diff(at(result.range.start), 'hours').hours).toBe(25);
+  it("fits the range to first-zone calendar days across DST", () => {
+    const result = findSlots({
+      zones: [openNY],
+      startDate: "2026-11-01",
+      days: 1,
+    });
+    expect(
+      at(result.range.end).diff(at(result.range.start), "hours").hours,
+    ).toBe(25);
   });
 });
 
-describe('shared validation and time-zone discovery', () => {
+describe("shared validation and time-zone discovery", () => {
   it.each([
-    [{ zones: [{ id: 'Mars/Olympus' }], startDate: '2026-11-02' }, 'Unknown IANA'],
-    [{ zones: [{ id: 'UTC', workStart: '9:00' }], startDate: '2026-11-02' }, 'HH:mm'],
-    [{ zones: [{ id: 'UTC', quietAfter: '24:00' }], startDate: '2026-11-02' }, 'HH:mm'],
-    [{ zones: [{ id: 'UTC', workEnd: '08:00' }], startDate: '2026-11-02' }, 'fit inside'], // overnight 09:00–08:00 exceeds 08:00–21:00
-    [{ zones: [{ id: 'UTC', workEnd: '09:00' }], startDate: '2026-11-02' }, 'differ'],
-    [{ zones: [{ id: 'UTC', quietBefore: '10:00' }], startDate: '2026-11-02' }, 'fit inside'],
-    [{ zones: [{ id: 'UTC' }], startDate: '2026-02-30' }, 'calendar date'],
-    [{ zones: [{ id: 'UTC' }], startDate: '2026-11-02', stepMinutes: 0 }, 'greater than'],
-    [{ zones: [{ id: 'UTC' }, { id: 'UTC' }], startDate: '2026-11-02' }, 'unique']
-  ])('reports clear errors for %j', (input, message) => {
+    [
+      { zones: [{ id: "Mars/Olympus" }], startDate: "2026-11-02" },
+      "Unknown IANA",
+    ],
+    [
+      { zones: [{ id: "UTC", workStart: "9:00" }], startDate: "2026-11-02" },
+      "HH:mm",
+    ],
+    [
+      { zones: [{ id: "UTC", quietAfter: "24:00" }], startDate: "2026-11-02" },
+      "HH:mm",
+    ],
+    [
+      { zones: [{ id: "UTC", workEnd: "08:00" }], startDate: "2026-11-02" },
+      "fit inside",
+    ],
+    [
+      { zones: [{ id: "UTC", workEnd: "09:00" }], startDate: "2026-11-02" },
+      "differ",
+    ],
+    [
+      { zones: [{ id: "UTC", quietBefore: "10:00" }], startDate: "2026-11-02" },
+      "fit inside",
+    ],
+    [{ zones: [{ id: "UTC" }], startDate: "2026-02-30" }, "calendar date"],
+    [
+      { zones: [{ id: "UTC" }], startDate: "2026-11-02", stepMinutes: 0 },
+      "greater than",
+    ],
+    [
+      { zones: [{ id: "UTC" }, { id: "UTC" }], startDate: "2026-11-02" },
+      "unique",
+    ],
+  ])("reports clear errors for %j", (input, message) => {
     const result = validateInput(input);
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.errors.map(error => error.message).join('; ')).toContain(message);
+    if (!result.success)
+      expect(result.errors.map((error) => error.message).join("; ")).toContain(
+        message,
+      );
     expect(() => findSlots(input)).toThrow(InputValidationError);
   });
 
-  it('rejects nonexistent civil dates in the first zone', () => {
-    const input = { zones: [{ id: 'Pacific/Apia' }], startDate: '2011-12-30' };
+  it("rejects nonexistent civil dates in the first zone", () => {
+    const input = { zones: [{ id: "Pacific/Apia" }], startDate: "2011-12-30" };
     expect(() => findSlots(input)).toThrow(/civil date does not exist/);
     expect(validateInput(input).success).toBe(false);
   });
 
-  it('resolves defaults, including a regional Fri/Sat weekend for Dhaka', () => {
-    const result = validateInput({ zones: [{ id: 'Asia/Dhaka' }, { id: 'Europe/London' }, { id: 'UTC', weekend: [] }, { id: 'Asia/Riyadh', weekend: [7] }], startDate: '2026-11-02' });
+  it("resolves defaults, including a regional Fri/Sat weekend for Dhaka", () => {
+    const result = validateInput({
+      zones: [
+        { id: "Asia/Dhaka" },
+        { id: "Europe/London" },
+        { id: "UTC", weekend: [] },
+        { id: "Asia/Riyadh", weekend: [7] },
+      ],
+      startDate: "2026-11-02",
+    });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.zones.map(zone => zone.weekend)).toEqual([[5, 6], [6, 7], [], [7]]);
-      expect(['Africa/Cairo', 'Asia/Muscat', 'Indian/Maldives'].map(defaultWeekend)).toEqual([[5, 6], [5, 6], [5, 6]]);
-      expect(['Asia/Dubai', 'Asia/Tehran', 'Asia/Karachi'].map(defaultWeekend)).toEqual([[6, 7], [6, 7], [6, 7]]);
+      expect(result.data.zones.map((zone) => zone.weekend)).toEqual([
+        [5, 6],
+        [6, 7],
+        [],
+        [7],
+      ]);
+      expect(
+        ["Africa/Cairo", "Asia/Muscat", "Indian/Maldives"].map(defaultWeekend),
+      ).toEqual([
+        [5, 6],
+        [5, 6],
+        [5, 6],
+      ]);
+      expect(
+        ["Asia/Dubai", "Asia/Tehran", "Asia/Karachi"].map(defaultWeekend),
+      ).toEqual([
+        [6, 7],
+        [6, 7],
+        [6, 7],
+      ]);
       expect(result.data.days).toBe(5);
       expect(result.data.durationMinutes).toBe(30);
       expect(result.data.stepMinutes).toBe(15);
     }
   });
 
-  it('shares config defaults, rejects unknown config fields', () => {
-    expect(configSchema.parse({ zones: [{ id: 'UTC' }] }).top).toBe(10);
+  it("shares config defaults, rejects unknown config fields", () => {
+    expect(configSchema.parse({ zones: [{ id: "UTC" }] }).top).toBe(10);
     expect(configSchema.safeParse({ bogus: true }).success).toBe(false);
   });
 
-  it('searches runtime time zones and includes UTC', () => {
-    expect(listTimeZones('dhaka')).toContain('Asia/Dhaka');
-    expect(listTimeZones('new_york')).toContain('America/New_York');
-    expect(listTimeZones('utc')).toEqual(['UTC']);
+  it("searches runtime time zones and includes UTC", () => {
+    expect(listTimeZones("dhaka")).toContain("Asia/Dhaka");
+    expect(listTimeZones("new_york")).toContain("America/New_York");
+    expect(listTimeZones("utc")).toEqual(["UTC"]);
   });
 
-  it('requires unambiguous ISO instants for independent span evaluation', () => {
-    expect(() => classifySpan(openNY, '2026-11-01T01:30:00', '2026-11-01T02:00:00')).toThrow(/offset/);
+  it("requires unambiguous ISO instants for independent span evaluation", () => {
+    expect(() =>
+      classifySpan(openNY, "2026-11-01T01:30:00", "2026-11-01T02:00:00"),
+    ).toThrow(/offset/);
   });
 });
 
-describe('holidays', () => {
-  const pair: ZoneRule[] = [{ id: 'Asia/Dhaka', label: 'Dhaka' }, { id: 'Europe/London', label: 'London' }];
+describe("holidays", () => {
+  const pair: ZoneRule[] = [
+    { id: "Asia/Dhaka", label: "Dhaka" },
+    { id: "Europe/London", label: "London" },
+  ];
 
-  it('blocks the whole local holiday date and explains it when nothing fits', () => {
-    // Wednesday 16 Dec 2026, Victory Day in Bangladesh.
-    const zones: ZoneRule[] = [{ ...pair[0]!, holidays: ['2026-12-16'] }, pair[1]!];
-    const result = findSlots({ zones, startDate: '2026-12-16', days: 1 });
+  it("blocks the whole local holiday date and explains it when nothing fits", () => {
+    const zones: ZoneRule[] = [
+      { ...pair[0]!, holidays: ["2026-12-16"] },
+      pair[1]!,
+    ];
+    const result = findSlots({ zones, startDate: "2026-12-16", days: 1 });
     expect(result.slots).toEqual([]);
-    expect(result.diagnostics.mostRestrictive).toMatchObject({ zoneId: 'Asia/Dhaka', constraint: 'holiday' });
-    expect(result.diagnostics.suggestion).toContain('holiday in Dhaka');
+    expect(result.diagnostics.mostRestrictive).toMatchObject({
+      zoneId: "Asia/Dhaka",
+      constraint: "holiday",
+    });
+    expect(result.diagnostics.suggestion).toContain("holiday in Dhaka");
   });
 
-  it('only blocks the listed dates, judged in that zone', () => {
-    const zones: ZoneRule[] = [{ ...pair[0]!, holidays: ['2026-12-16'] }, pair[1]!];
-    const result = findSlots({ zones, startDate: '2026-12-15', days: 3 });
-    expect(new Set(result.slots.map(slot => slot.zones[0]!.localStart.slice(0, 10)))).toEqual(new Set(['2026-12-15', '2026-12-17']));
-    expect(classifySpan(zones[0]!, '2026-12-15T17:45:00Z', '2026-12-15T18:15:00Z').constraints).toContain('holiday'); // crosses Dhaka midnight into the 16th
+  it("only blocks the listed dates, judged in that zone", () => {
+    const zones: ZoneRule[] = [
+      { ...pair[0]!, holidays: ["2026-12-16"] },
+      pair[1]!,
+    ];
+    const result = findSlots({ zones, startDate: "2026-12-15", days: 3 });
+    expect(
+      new Set(
+        result.slots.map((slot) => slot.zones[0]!.localStart.slice(0, 10)),
+      ),
+    ).toEqual(new Set(["2026-12-15", "2026-12-17"]));
+    expect(
+      classifySpan(zones[0]!, "2026-12-15T17:45:00Z", "2026-12-15T18:15:00Z")
+        .constraints,
+    ).toContain("holiday");
   });
 
-  it('validates holiday dates', () => {
-    for (const holidays of [['2026-13-01'], ['16-12-2026'], ['2026-12-16', '2026-12-16']]) {
-      expect(validateInput({ zones: [{ id: 'UTC', holidays }], startDate: '2026-12-15' }).success).toBe(false);
+  it("validates holiday dates", () => {
+    for (const holidays of [
+      ["2026-13-01"],
+      ["16-12-2026"],
+      ["2026-12-16", "2026-12-16"],
+    ]) {
+      expect(
+        validateInput({
+          zones: [{ id: "UTC", holidays }],
+          startDate: "2026-12-15",
+        }).success,
+      ).toBe(false);
     }
   });
 });
 
-describe('overnight windows', () => {
-  const night: ZoneRule = { id: 'UTC', weekend: [], workStart: '22:00', workEnd: '06:00', quietBefore: '20:00', quietAfter: '08:00' };
+describe("overnight windows", () => {
+  const night: ZoneRule = {
+    id: "UTC",
+    weekend: [],
+    workStart: "22:00",
+    workEnd: "06:00",
+    quietBefore: "20:00",
+    quietAfter: "08:00",
+  };
 
-  it('accepts work and allowed hours that run past midnight', () => {
-    expect(validateInput({ zones: [night], startDate: '2026-11-02' }).success).toBe(true);
-    // Overnight work must still sit inside the allowed window.
-    expect(validateInput({ zones: [{ ...night, workStart: '19:00' }], startDate: '2026-11-02' }).success).toBe(false);
-    expect(validateInput({ zones: [{ ...night, quietBefore: '08:00', quietAfter: '21:00' }], startDate: '2026-11-02' }).success).toBe(false);
+  it("accepts work and allowed hours that run past midnight", () => {
+    expect(
+      validateInput({ zones: [night], startDate: "2026-11-02" }).success,
+    ).toBe(true);
+    expect(
+      validateInput({
+        zones: [{ ...night, workStart: "19:00" }],
+        startDate: "2026-11-02",
+      }).success,
+    ).toBe(false);
+    expect(
+      validateInput({
+        zones: [{ ...night, quietBefore: "08:00", quietAfter: "21:00" }],
+        startDate: "2026-11-02",
+      }).success,
+    ).toBe(false);
   });
 
-  it('classifies a night shift across midnight, including the end boundary', () => {
-    expect(classifySpan(night, '2026-11-02T23:30:00Z', '2026-11-03T00:30:00Z').classification).toBe('ideal');
-    expect(classifySpan(night, '2026-11-03T05:30:00Z', '2026-11-03T06:00:00Z').classification).toBe('ideal');
-    expect(classifySpan(night, '2026-11-02T21:00:00Z', '2026-11-02T21:30:00Z').classification).toBe('acceptable');
-    expect(classifySpan(night, '2026-11-02T12:00:00Z', '2026-11-02T12:30:00Z').constraints).toContain('quiet');
+  it("classifies a night shift across midnight, including the end boundary", () => {
+    expect(
+      classifySpan(night, "2026-11-02T23:30:00Z", "2026-11-03T00:30:00Z")
+        .classification,
+    ).toBe("ideal");
+    expect(
+      classifySpan(night, "2026-11-03T05:30:00Z", "2026-11-03T06:00:00Z")
+        .classification,
+    ).toBe("ideal");
+    expect(
+      classifySpan(night, "2026-11-02T21:00:00Z", "2026-11-02T21:30:00Z")
+        .classification,
+    ).toBe("acceptable");
+    expect(
+      classifySpan(night, "2026-11-02T12:00:00Z", "2026-11-02T12:30:00Z")
+        .constraints,
+    ).toContain("quiet");
   });
 
-  it('ranks night-shift slots and describes pre-shift time as before work', () => {
-    const result = findSlots({ zones: [night], startDate: '2026-11-02', days: 1, stepMinutes: 30 });
+  it("ranks night-shift slots and describes pre-shift time as before work", () => {
+    const result = findSlots({
+      zones: [night],
+      startDate: "2026-11-02",
+      days: 1,
+      stepMinutes: 30,
+    });
     const top = result.slots[0]!;
-    expect(top.zones[0]!.classification).toBe('ideal');
-    // Midpoint of 22:00–06:00 is 02:00; the best-scored slot sits near it.
-    expect(Math.abs(DateTime.fromISO(top.start, { zone: 'UTC' }).hour - 2)).toBeLessThanOrEqual(1);
-    expect(result.slots.find(slot => slot.start.startsWith('2026-11-02T21:00'))!.reason).toBe('before work (acceptable) for UTC');
+    expect(top.zones[0]!.classification).toBe("ideal");
+    expect(
+      Math.abs(DateTime.fromISO(top.start, { zone: "UTC" }).hour - 2),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      result.slots.find((slot) => slot.start.startsWith("2026-11-02T21:00"))!
+        .reason,
+    ).toBe("before work (acceptable) for UTC");
   });
 
-  it('keeps a night shift paired with a London day team', () => {
-    const zones: ZoneRule[] = [{ ...night, id: 'America/New_York', label: 'NY night desk' }, { id: 'Europe/London', label: 'London' }];
-    const result = findSlots({ zones, startDate: '2026-11-03', days: 1 });
-    // London's allowed 08:00–21:00 is 03:00–16:00 in New York; it meets the night desk's 20:00–08:00 at 03:00–08:00.
-    const nyStarts = result.slots.map(slot => DateTime.fromISO(slot.zones[0]!.localStart, { setZone: true }));
+  it("keeps a night shift paired with a London day team", () => {
+    const zones: ZoneRule[] = [
+      { ...night, id: "America/New_York", label: "NY night desk" },
+      { id: "Europe/London", label: "London" },
+    ];
+    const result = findSlots({ zones, startDate: "2026-11-03", days: 1 });
+    const nyStarts = result.slots.map((slot) =>
+      DateTime.fromISO(slot.zones[0]!.localStart, { setZone: true }),
+    );
     expect(nyStarts.length).toBeGreaterThan(0);
-    expect(nyStarts.every(time => time.hour >= 3 && time.hour < 8)).toBe(true);
-    // 03:00–06:00 is inside the night shift, so the top pick is ideal for both teams.
-    expect(result.slots[0]!.zones.map(zone => zone.classification)).toEqual(['ideal', 'ideal']);
-    expect(result.slots.some(slot => slot.zones[0]!.classification === 'acceptable')).toBe(true);
+    expect(nyStarts.every((time) => time.hour >= 3 && time.hour < 8)).toBe(
+      true,
+    );
+    expect(result.slots[0]!.zones.map((zone) => zone.classification)).toEqual([
+      "ideal",
+      "ideal",
+    ]);
+    expect(
+      result.slots.some(
+        (slot) => slot.zones[0]!.classification === "acceptable",
+      ),
+    ).toBe(true);
   });
 });

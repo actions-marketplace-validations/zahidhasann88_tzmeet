@@ -51,6 +51,12 @@ import {
   type ImportedCalendar,
 } from "./calendars";
 import { CRON_ROUTE, isCronRoute } from "./cron-state";
+import MePage from "./Me";
+import { ME_ROUTE, isMeRoute } from "./me-state";
+
+type View = "meet" | "cron" | "me";
+const viewOf = (hash: string): View =>
+  isCronRoute(hash) ? "cron" : isMeRoute(hash) ? "me" : "meet";
 
 type StateSetter = Dispatch<SetStateAction<WebState | null>>;
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -68,14 +74,14 @@ export default function App() {
   const [state, setState] = useState<WebState | null>(null);
   const [notice, setNotice] = useState("");
   const [copyFallback, setCopyFallback] = useState("");
-  // Imported calendars are never in the URL or share links. They're kept in memory,
-  // and in this browser's storage only for those the user chose to remember.
   const [calendars, setCalendars] = useState<Record<string, ImportedCalendar>>(
     () => loadRememberedCalendars(storage()),
   );
   useEffect(() => {
     if (!saveRememberedCalendars(calendars, storage()))
-      setNotice("This calendar is too large to remember on this device. It stays until you reload.");
+      setNotice(
+        "This calendar is too large to remember on this device. It stays until you reload.",
+      );
   }, [calendars]);
   const input = state?.input;
   const calendarResults = useMemo(
@@ -86,11 +92,9 @@ export default function App() {
     () => (input ? withBusy(input, calendarResults) : null),
     [input, calendarResults],
   );
-  const [cronView, setCronView] = useState(() =>
-    isCronRoute(window.location.hash),
-  );
+  const [view, setView] = useState<View>(() => viewOf(window.location.hash));
   useEffect(() => {
-    const route = () => setCronView(isCronRoute(window.location.hash));
+    const route = () => setView(viewOf(window.location.hash));
     window.addEventListener("hashchange", route);
     return () => window.removeEventListener("hashchange", route);
   }, []);
@@ -147,16 +151,18 @@ export default function App() {
     );
   return (
     <div className="site-shell">
-      {cronView ? (
+      {view !== "meet" ? (
         <a
           className="skip-link"
-          href="#cron-results"
+          href={view === "cron" ? "#cron-results" : "#me-view"}
           onClick={(event) => {
             event.preventDefault();
-            document.getElementById("cron-results")?.focus();
+            document
+              .getElementById(view === "cron" ? "cron-results" : "me-view")
+              ?.focus();
           }}
         >
-          Skip to cron results
+          {view === "cron" ? "Skip to cron results" : "Skip to working hours"}
         </a>
       ) : (
         <a className="skip-link" href="#results">
@@ -175,11 +181,20 @@ export default function App() {
         </div>
         <div className="header-actions">
           <nav className="view-nav" aria-label="Tools">
-            <a href="#/" aria-current={cronView ? undefined : "page"}>
+            <a href="#/" aria-current={view === "meet" ? "page" : undefined}>
               Meetings
             </a>
-            <a href={CRON_ROUTE} aria-current={cronView ? "page" : undefined}>
+            <a
+              href={CRON_ROUTE}
+              aria-current={view === "cron" ? "page" : undefined}
+            >
               Cron
+            </a>
+            <a
+              href={ME_ROUTE}
+              aria-current={view === "me" ? "page" : undefined}
+            >
+              My hours
             </a>
           </nav>
           <span className="privacy-note">
@@ -201,7 +216,7 @@ export default function App() {
           >
             <Icon name={state.theme === "light" ? "moon" : "sun"} />
           </button>
-          {!cronView && (
+          {view === "meet" && (
             <button
               className="button button-outline share-button"
               onClick={() => {
@@ -222,8 +237,10 @@ export default function App() {
         </div>
       </header>
       <main>
-        {cronView ? (
+        {view === "cron" ? (
           <CronPage copy={copy} />
+        ) : view === "me" ? (
+          <MePage copy={copy} />
         ) : (
           <>
             <section className="intro" aria-labelledby="page-title">
@@ -512,7 +529,11 @@ function ZoneSettings({
                       type="checkbox"
                       aria-label={`${zone.label ?? zone.id} attendance is optional`}
                       checked={!!zone.optional}
-                      onChange={(event) => change(index, { optional: event.target.checked || undefined })}
+                      onChange={(event) =>
+                        change(index, {
+                          optional: event.target.checked || undefined,
+                        })
+                      }
                     />
                     <span>Optional attendee: never blocks a time</span>
                   </label>
@@ -683,7 +704,6 @@ function ZoneSettings({
   );
 }
 
-/** Free-text date list kept as a local draft so typing separators isn't fought by the parsed value. */
 function HolidayField({
   zone,
   onChange,
@@ -712,7 +732,6 @@ function HolidayField({
   );
 }
 
-/** Country public holidays, with the next few shown so people can check them. */
 function HolidayPresetField({
   zone,
   from,
@@ -764,14 +783,16 @@ function HolidayPresetField({
             .join(" · ")}
         </span>
       )}
-      {zone.holidayPreset && presetNote(zone.holidayPreset, Number(from.slice(0, 4))) && (
-        <span className="detail-hint">{presetNote(zone.holidayPreset, Number(from.slice(0, 4)))}</span>
-      )}
+      {zone.holidayPreset &&
+        presetNote(zone.holidayPreset, Number(from.slice(0, 4))) && (
+          <span className="detail-hint">
+            {presetNote(zone.holidayPreset, Number(from.slice(0, 4)))}
+          </span>
+        )}
     </label>
   );
 }
 
-/** Shorter work hours during Ramadan, stored as special hours for this year and next. */
 function RamadanField({
   zone,
   from,
@@ -779,10 +800,16 @@ function RamadanField({
 }: {
   zone: NormalizedInput["zones"][number];
   from: string;
-  onChange: (specialHours: NormalizedInput["zones"][number]["specialHours"]) => void;
+  onChange: (
+    specialHours: NormalizedInput["zones"][number]["specialHours"],
+  ) => void;
 }) {
-  const ramadan = (zone.specialHours ?? []).filter((period) => period.label === "Ramadan");
-  const others = (zone.specialHours ?? []).filter((period) => period.label !== "Ramadan");
+  const ramadan = (zone.specialHours ?? []).filter(
+    (period) => period.label === "Ramadan",
+  );
+  const others = (zone.specialHours ?? []).filter(
+    (period) => period.label !== "Ramadan",
+  );
   const label = zone.label ?? zone.id;
   const enable = (workStart: string, workEnd: string) => {
     const year = Number(from.slice(0, 4)) || new Date().getFullYear();
@@ -793,8 +820,12 @@ function RamadanField({
     onChange([...others, ...periods]);
   };
   const setHours = (workStart: string, workEnd: string) =>
-    onChange([...others, ...ramadan.map((period) => ({ ...period, workStart, workEnd }))]);
-  const format = (date: string) => DateTime.fromISO(date).setLocale("en").toFormat("d LLL yyyy");
+    onChange([
+      ...others,
+      ...ramadan.map((period) => ({ ...period, workStart, workEnd })),
+    ]);
+  const format = (date: string) =>
+    DateTime.fromISO(date).setLocale("en").toFormat("d LLL yyyy");
   return (
     <fieldset className="ramadan-field">
       <legend>Ramadan hours</legend>
@@ -803,7 +834,11 @@ function RamadanField({
           type="checkbox"
           aria-label={`${label} Ramadan hours`}
           checked={ramadan.length > 0}
-          onChange={(event) => (event.target.checked ? enable("09:00", "15:30") : onChange(others.length ? others : undefined))}
+          onChange={(event) =>
+            event.target.checked
+              ? enable("09:00", "15:30")
+              : onChange(others.length ? others : undefined)
+          }
         />
         <span>Use shorter work hours during Ramadan</span>
       </label>
@@ -812,15 +847,32 @@ function RamadanField({
           <div className="field-pair">
             <label>
               Starts
-              <input type="time" aria-label={`${label} Ramadan work starts`} value={ramadan[0]!.workStart} onChange={(event) => setHours(event.target.value, ramadan[0]!.workEnd)} />
+              <input
+                type="time"
+                aria-label={`${label} Ramadan work starts`}
+                value={ramadan[0]!.workStart}
+                onChange={(event) =>
+                  setHours(event.target.value, ramadan[0]!.workEnd)
+                }
+              />
             </label>
             <label>
               Ends
-              <input type="time" aria-label={`${label} Ramadan work ends`} value={ramadan[0]!.workEnd} onChange={(event) => setHours(ramadan[0]!.workStart, event.target.value)} />
+              <input
+                type="time"
+                aria-label={`${label} Ramadan work ends`}
+                value={ramadan[0]!.workEnd}
+                onChange={(event) =>
+                  setHours(ramadan[0]!.workStart, event.target.value)
+                }
+              />
             </label>
           </div>
           <span className="detail-hint">
-            {ramadan.map((period) => `${format(period.from)} – ${format(period.to)}`).join(" · ")} (approximate, from the Umm al-Qura calendar).
+            {ramadan
+              .map((period) => `${format(period.from)} – ${format(period.to)}`)
+              .join(" · ")}{" "}
+            (approximate, from the Umm al-Qura calendar).
           </span>
         </>
       )}
@@ -828,7 +880,6 @@ function RamadanField({
   );
 }
 
-/** Import an .ics file (or pasted calendar text) as busy times for one zone. */
 function CalendarField({
   zone,
   calendar,
@@ -869,7 +920,9 @@ function CalendarField({
               type="checkbox"
               aria-label={`Remember ${label} busy calendar on this device`}
               checked={!!calendar.remember}
-              onChange={(event) => onChange({ ...calendar, remember: event.target.checked })}
+              onChange={(event) =>
+                onChange({ ...calendar, remember: event.target.checked })
+              }
             />
             <span>Remember on this device</span>
           </label>
@@ -927,9 +980,9 @@ function CalendarField({
         </>
       )}
       <span className="detail-hint">
-        Read only in this browser. Busy times are never put in share links,
-        and event titles are ignored. Remembered calendars are saved in this
-        browser only.
+        Read only in this browser. Busy times are never put in share links, and
+        event titles are ignored. Remembered calendars are saved in this browser
+        only.
       </span>
     </div>
   );
@@ -1223,7 +1276,7 @@ function WorkspaceResults({
   copy,
   notify,
 }: {
-  /** state.input plus in-memory calendar busy times. */
+
   input: NormalizedInput;
   state: WebState;
   setState: StateSetter;
@@ -1258,8 +1311,6 @@ function WorkspaceResults({
       (slot) =>
         DateTime.fromISO(slot.start, { zone: "UTC" }).toISODate() === state.day,
     ) ?? [];
-  // A slot link opened fresh scrolls straight to that slot. Runs before App rewrites the URL, so plain visits are unaffected.
-  // A slot link opened fresh scrolls to that slot once its results first arrive.
   const openedFromLink = useRef(
     Boolean(state.selected) && /[?&](?:state|s)=/.test(window.location.search),
   );
@@ -1270,7 +1321,6 @@ function WorkspaceResults({
       .getElementById(`slot-${state.selected}`)
       ?.scrollIntoView({ block: "center" });
   }, [result, state.selected]);
-  /** URL that opens this exact workspace with one slot selected, expanded and visible. */
   function slotLink(slot: Slot, index: number) {
     const focused = {
       ...state,
@@ -1514,7 +1564,9 @@ function WorkspaceResults({
             <h2 id="results-heading">Your best meeting times</h2>
           </div>
           <span className="results-count" aria-live="polite">
-            {search.pending && !result ? "Searching…" : `${result?.slots.length ?? 0} options`}
+            {search.pending && !result
+              ? "Searching…"
+              : `${result?.slots.length ?? 0} options`}
           </span>
         </div>
         <p className="results-help">
@@ -1599,7 +1651,9 @@ function WorkspaceResults({
                             ? "Acceptable"
                             : "Unavailable"}
                       </span>
-                      {zone.optional && <span className="badge badge-optional">Optional</span>}
+                      {zone.optional && (
+                        <span className="badge badge-optional">Optional</span>
+                      )}
                     </div>
                   </div>
                 ))}

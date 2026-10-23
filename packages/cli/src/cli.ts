@@ -1,6 +1,8 @@
 import { Command, CommanderError } from "commander";
 import {
   explainCron,
+  looksLikeNaturalCron,
+  parseNaturalCron,
   convertCronDialect,
   convertCronZone,
   cronDialects,
@@ -8,12 +10,18 @@ import {
   listTimeZones,
   parseIntegerOption,
   recurringImpact,
+  recurringCalendarText,
   fairRotation,
   type CronDialect,
 } from "@tzmeet/core";
 import { readConfig, resolveOptions, type CliFlags } from "./config.js";
 import { formatRotation, formatTable, selectTop } from "./output.js";
-import { defaultCronZones, formatConversion, formatCron } from "./cron.js";
+import {
+  defaultCronZones,
+  formatConversion,
+  formatCron,
+  formatNatural,
+} from "./cron.js";
 import { checkCronFiles, formatCheck } from "./check.js";
 import { formatRecurring } from "./recurring.js";
 import { applyBusy } from "./busy.js";
@@ -253,6 +261,9 @@ Convert:
   tzmeet cron "0 9 * * 1-5" --to quartz
   tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
 
+Plain English works too:
+  tzmeet cron "every weekday at 9am Dhaka" --to kubernetes
+
 Check files in CI (exit 1 on DST problems; --zone is used where none is set):
   tzmeet cron --check k8s/ crontab --zone America/New_York --format github
 `,
@@ -304,9 +315,23 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
           if (failing.length) exitCode = 1;
           return;
         }
+        let expression = parts.join(" ");
+        let dialect = options.dialect as CronDialect | undefined;
+        let zone = options.zone;
+        if (looksLikeNaturalCron(expression)) {
+          const natural = parseNaturalCron(expression, {
+            dialect: dialect ?? "unix",
+          });
+          if (!natural.expressions.length)
+            throw new Error(
+              `Couldn't turn "${expression}" into cron: ${natural.problems.join(" ")}`,
+            );
+          if (!json) writeOut(formatNatural(natural));
+          dialect = natural.dialect;
+          zone = options.zone ?? natural.zone;
+          expression = natural.expressions[0]!;
+        }
         if (options.to !== undefined || options.toZone !== undefined) {
-          const expression = parts.join(" ");
-          const dialect = options.dialect as CronDialect | undefined;
           if (
             options.to !== undefined &&
             !cronDialects.includes(options.to as CronDialect)
@@ -328,7 +353,7 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
                   zone: convertCronZone({
                     expression,
                     ...(dialect ? { dialect } : {}),
-                    fromZone: options.zone ?? "UTC",
+                    fromZone: zone ?? "UTC",
                     toZone: options.toZone,
                     from,
                   }),
@@ -345,11 +370,9 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
           return;
         }
         const result = explainCron({
-          expression: parts.join(" "),
-          ...(options.dialect
-            ? { dialect: options.dialect as CronDialect }
-            : {}),
-          ...(options.zone ? { zone: options.zone } : {}),
+          expression,
+          ...(dialect ? { dialect } : {}),
+          ...(zone ? { zone } : {}),
           displayZones: options.display
             ? options.display
                 .split(",")
@@ -374,6 +397,10 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
     )
     .requiredOption("--time <HH:mm>", "meeting time in the first zone")
     .option("--weeks <count>", "how many weeks to check, 1-104 (default: 26)")
+    .option(
+      "--ics",
+      "print the weekly series as an .ics calendar file instead of the report",
+    )
     .addHelpText(
       "after",
       `
@@ -384,7 +411,7 @@ Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holid
   tzmeet recurring --zones America/New_York,Asia/Dhaka --time 09:00 --weeks 52 --json
 `,
     )
-    .action((options: { time: string; weeks?: string }) => {
+    .action((options: { time: string; weeks?: string; ics?: boolean }) => {
       const flags = program.opts<CliFlags>();
       const config = readConfig(context.cwd ?? process.cwd(), flags.config);
       const { input } = resolveOptions(
@@ -408,6 +435,14 @@ Zone flags (--zones, --date, --duration, --work, --zone-work, --weekend, --holid
         time: options.time,
         weeks,
       });
+      if (options.ics) {
+        writeOut(
+          recurringCalendarText(result, {
+            created: (context.now?.() ?? new Date()).toISOString(),
+          }),
+        );
+        return;
+      }
       writeOut(
         flags.json
           ? `${JSON.stringify(result, null, 2)}

@@ -247,7 +247,6 @@ function parsePart(
   if (bounds.length > 2)
     throw new FieldError(`"${token}" is not a valid range`, token);
   const from = parseValue(rule, bounds[0]!);
-  // "5/15" means "5-max/15".
   const to =
     bounds.length === 2
       ? parseValue(rule, bounds[1]!)

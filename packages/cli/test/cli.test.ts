@@ -1306,3 +1306,87 @@ describe("cron --check", () => {
     ).toContain("--format must be text or github");
   });
 });
+
+describe("cron in plain English", () => {
+  it("translates, says what it understood, and explains the result", () => {
+    const output = invoke([
+      "cron",
+      "every",
+      "weekday",
+      "at",
+      "9am",
+      "Dhaka",
+      "--count",
+      "1",
+      "--display",
+      "UTC",
+      "--from",
+      "2026-10-23T00:00:00Z",
+    ]);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout).toContain(
+      'Understood "every weekday at 9am Dhaka" as:\n  0 9 * * 1-5  (Asia/Dhaka)',
+    );
+    expect(output.stdout).toContain(
+      "0 9 * * 1-5  (Unix cron, runs in Asia/Dhaka)",
+    );
+    expect(output.stdout).toContain("Fri 23 Oct 2026 09:00 +06:00");
+  });
+
+  it("feeds conversions and JSON", () => {
+    expect(
+      invoke(["cron", "every weekday at 9am Dhaka", "--to", "quartz"]).stdout,
+    ).toContain("Quartz:\n  0 0 9 ? * MON-FRI");
+    expect(
+      invoke([
+        "cron",
+        "first monday of the month at 10am",
+        "--dialect",
+        "spring",
+        "--to",
+        "quartz",
+      ]).stdout,
+    ).toContain("0 0 10 ? * MON#1");
+    const json = JSON.parse(
+      invoke(["cron", "daily at 2:30am New York", "--json", "--count", "1"])
+        .stdout,
+    );
+    expect(json).toMatchObject({
+      expression: "30 2 * * *",
+      zone: "America/New_York",
+    });
+  });
+
+  it("exits 1 with the reason when it can't translate", () => {
+    const output = invoke(["cron", "every other monday at 9am"]);
+    expect(output.code).toBe(1);
+    expect(output.stderr).toContain(
+      'Couldn\'t turn "every other monday at 9am" into cron: Cron can\'t do "every other monday"',
+    );
+  });
+});
+
+describe("recurring --ics", () => {
+  it("prints the weekly series as a calendar file", () => {
+    const output = invoke([
+      "recurring",
+      "--zones",
+      "Europe/London,America/New_York",
+      "--date",
+      "2026-10-12",
+      "--time",
+      "14:00",
+      "--weeks",
+      "10",
+      "--ics",
+    ]);
+    expect(output.code, output.stderr).toBe(0);
+    expect(output.stdout.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
+    expect(output.stdout).toContain(
+      "DTSTART;TZID=Europe/London:20261012T140000\r\n",
+    );
+    expect(output.stdout).toContain("RRULE:FREQ=WEEKLY;COUNT=10\r\n");
+    expect(output.stdout).toContain("BEGIN:VTIMEZONE\r\nTZID:Europe/London");
+    expect(output.stdout).toContain("DTSTAMP:20261101T200000Z");
+  });
+});

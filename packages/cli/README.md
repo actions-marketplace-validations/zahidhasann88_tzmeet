@@ -30,6 +30,10 @@ tzmeet --zones Asia/Dhaka,America/New_York --zone-work America/New_York=08:00-17
 # Avoid prayer times (10 minutes either side)
 tzmeet --zones Asia/Dhaka,Europe/London --prayer-location Dhaka --prayer-buffer 10
 
+# Weekly meeting through DST changes, then as a calendar series
+tzmeet recurring --zones Europe/London,America/New_York,Asia/Dhaka --date 2026-10-12 --time 14:00
+tzmeet recurring --zones Europe/London,America/New_York --date 2026-10-12 --time 14:00 --ics > team-sync.ics
+
 # Find a time zone name
 tzmeet zones london
 ```
@@ -73,6 +77,9 @@ tzmeet cron "0 9 * * 1-5" --to quartz          # 0 0 9 ? * MON-FRI
 
 # "I want 09:00 Dhaka, but the server runs in UTC"
 tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
+
+# Plain English works too
+tzmeet cron "every weekday at 9am Dhaka" --to kubernetes
 ```
 
 When daylight saving changes the gap between the zones, `--to-zone` lists one expression per period and recommends setting the scheduler's own time zone instead (`CRON_TZ`, `spec.timeZone`, `@Scheduled(zone)`, Quartz `inTimeZone`).

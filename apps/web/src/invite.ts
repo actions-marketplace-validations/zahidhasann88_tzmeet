@@ -14,15 +14,18 @@ const stamp = (iso: string) =>
     .toFormat("yyyyLLdd'T'HHmmss'Z'");
 
 export function downloadCalendar(slot: Slot): void {
+  downloadIcs(calendarText(slot), `tzmeet-${stamp(slot.start)}.ics`);
+}
+
+export function downloadIcs(text: string, filename: string): void {
   const url = URL.createObjectURL(
-    new Blob([calendarText(slot)], { type: "text/calendar;charset=utf-8" }),
+    new Blob([text], { type: "text/calendar;charset=utf-8" }),
   );
   const link = document.createElement("a");
   link.href = url;
-  link.download = `tzmeet-${stamp(slot.start)}.ics`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
-  // Browsers may consume the blob asynchronously after the click.
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

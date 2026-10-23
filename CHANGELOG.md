@@ -14,6 +14,10 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 - Cron converters: `convertCronDialect` converts between Unix, Kubernetes, Spring and Quartz syntax (seconds and year fields, Quartz `?`, day-of-week numbering, day-of-month/day-of-week meaning), and `convertCronZone` rewrites a schedule for a scheduler in another time zone, with one expression per DST period and the native time-zone setting. Available as `tzmeet cron --to/--to-zone`, `GET /v1/cron/convert` and a Convert panel on the web cron page.
 - Cron check for CI: `tzmeet cron --check <files/folders>` scans crontabs and Kubernetes CronJob YAML, fails on runs that DST skips, delays or doubles, warns about missing `spec.timeZone` and day-of-month/day-of-week OR, and prints GitHub annotations with `--format github`. Also a GitHub Action (`action.yml`).
 
+- Plain-English cron: `parseNaturalCron("every weekday at 9am Dhaka")` gives `0 9 * * 1-5` in Asia/Dhaka (times, steps with windows, weekdays, days of the month, last day / nth weekday, months, zones by city or IANA ID) and reports anything it can't translate. `tzmeet cron` and the web cron page accept plain English; also `GET /v1/cron/natural`.
+- Recurring calendar invites: `recurringCalendarText(impact)` writes a weekly series fixed in the first zone (`TZID`, `RRULE`, generated `VTIMEZONE`) so calendars keep it right through daylight saving. "Download weekly series" in the web app's "Check over time" panel, `tzmeet recurring --ics` and `/v1/recurring?format=ics`.
+- "My hours" page (`#/me`): make a link with your name, time zone, work hours, weekend and public holidays; whoever opens it sees whether you're working now, your next working time and a 7-day grid in their own time zone. Shared through a `/me/` page with its own link preview.
+
 ### Changed
 
 - Spring cron schedules now report that a time in the repeated DST hour runs twice, confirmed by running Spring 6.2.19 and 7.0.10. The `fold-maybe-twice` run note and `dst-maybe-double` warning code are removed.

@@ -1,4 +1,6 @@
-import { DateTime } from "luxon";
+import { DateTime, IANAZone } from "luxon";
+import { scanTransitions } from "./transitions.js";
+import type { RecurringImpact } from "./recurring.js";
 import type { Slot } from "./types.js";
 
 export function inviteText(slot: Slot): string {
@@ -91,7 +93,6 @@ export function calendarText(slot: Slot, created: string): string {
   );
 }
 
-/** One RFC 5545 calendar containing all selected tentative slots. Explicit clock only. */
 export function calendarCollectionText(
   slots: readonly Slot[],
   created: string,
@@ -114,5 +115,107 @@ export function calendarCollectionText(
       ...events,
       "END:VCALENDAR",
     ].join("\r\n") + "\r\n"
+  );
+}
+
+const wall = (millis: number, zone: string) =>
+  DateTime.fromMillis(millis, { zone }).toFormat("yyyyLLdd'T'HHmmss");
+const offsetText = (minutes: number) =>
+  `${minutes < 0 ? "-" : "+"}${String(Math.floor(Math.abs(minutes) / 60)).padStart(2, "0")}${String(Math.abs(minutes) % 60).padStart(2, "0")}`;
+
+function timeZoneBlock(zone: string, from: number, to: number): string[] {
+  const tz = IANAZone.create(zone);
+  const changes = scanTransitions(tz, from, to);
+  const offsets = [
+    tz.offset(from),
+    ...changes.map((change) => change.offsetAfter),
+  ];
+  const standard = Math.min(...offsets);
+  const name = (millis: number) =>
+    DateTime.fromMillis(millis, { zone }).setLocale("en").toFormat("ZZZZ");
+  const observance = (
+    onset: string,
+    before: number,
+    after: number,
+    at: number,
+  ) => [
+    `BEGIN:${after > standard ? "DAYLIGHT" : "STANDARD"}`,
+    `DTSTART:${onset}`,
+    `TZOFFSETFROM:${offsetText(before)}`,
+    `TZOFFSETTO:${offsetText(after)}`,
+    `TZNAME:${name(at)}`,
+    `END:${after > standard ? "DAYLIGHT" : "STANDARD"}`,
+  ];
+  return [
+    "BEGIN:VTIMEZONE",
+    `TZID:${zone}`,
+    ...observance(wall(from, zone), tz.offset(from), tz.offset(from), from),
+    ...changes.flatMap((change) =>
+      observance(
+        DateTime.fromMillis(change.at + change.offsetBefore * 60000, {
+          zone: "UTC",
+        }).toFormat("yyyyLLdd'T'HHmmss"),
+        change.offsetBefore,
+        change.offsetAfter,
+        change.at,
+      ),
+    ),
+    "END:VTIMEZONE",
+  ];
+}
+
+export function recurringCalendarText(
+  impact: RecurringImpact,
+  options: { created: string; title?: string },
+): string {
+  const first = impact.occurrences[0]!;
+  const last = impact.occurrences.at(-1)!;
+  const zone = impact.anchor;
+  const start = Date.parse(first.start);
+  const end = Date.parse(first.end);
+  let hash = 2166136261;
+  for (const char of JSON.stringify([
+    zone,
+    impact.time,
+    first.date,
+    impact.durationMinutes,
+    impact.weeks,
+    first.zones.map((entry) => entry.id),
+  ]))
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  const firstWeek = first.zones
+    .map(
+      (entry) =>
+        `${DateTime.fromISO(entry.localStart, { setZone: true }).toFormat("HH:mm")} ${entry.label}`,
+    )
+    .join(" / ");
+  const description = [
+    `Every ${impact.weekday} at ${impact.time} ${zone} (${impact.durationMinutes} min), ${impact.weeks} weeks from ${first.date}.`,
+    `First week: ${firstWeek}.`,
+    ...impact.warnings.map((warning) => warning.message),
+  ].join("\n");
+  return (
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//tzmeet//Meeting slots//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      ...timeZoneBlock(zone, start - 86400000, Date.parse(last.end) + 86400000),
+      "BEGIN:VEVENT",
+      `UID:${stamp(first.start)}-${hash.toString(16)}-weekly@tzmeet.local`,
+      `DTSTAMP:${stamp(options.created)}`,
+      `DTSTART;TZID=${zone}:${wall(start, zone)}`,
+      `DTEND;TZID=${zone}:${wall(end, zone)}`,
+      `RRULE:FREQ=WEEKLY;COUNT=${impact.weeks}`,
+      `SUMMARY:${escapeText(options.title ?? "Team meeting")}`,
+      `DESCRIPTION:${escapeText(description)}`,
+      "STATUS:CONFIRMED",
+      "TRANSP:OPAQUE",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ]
+      .map(foldLine)
+      .join("\r\n") + "\r\n"
   );
 }

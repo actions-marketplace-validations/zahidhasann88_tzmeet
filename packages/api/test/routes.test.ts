@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   explainCron,
   convertCronZone,
+  parseNaturalCron,
   findSlots,
   parseScheduleInput,
   recurringImpact,
@@ -12,6 +13,7 @@ import {
   conversionResultSchema,
   cronResultSchema,
   cronConvertResultSchema,
+  cronNaturalResultSchema,
   errorSchema,
   recurringResultSchema,
   healthSchema,
@@ -781,7 +783,8 @@ describe("holiday presets over HTTP", () => {
     expect(error.details).toEqual([
       {
         field: "holidayPreset",
-        message: 'Unknown holiday preset "FR"; use BD, GB-ENG, IN, PK, AE, US or none',
+        message:
+          'Unknown holiday preset "FR"; use BD, GB-ENG, IN, PK, AE, US or none',
       },
     ]);
   });
@@ -907,42 +910,140 @@ describe("special hours and rotation over HTTP", () => {
   });
 });
 
-describe('optional attendees over HTTP', () => {
-  it('accepts optional zones on GET and POST', async () => {
-    const query = 'zones=Europe/London,Asia/Dhaka,America/New_York&date=2026-11-02&days=1&step=60&top=50';
-    const required = slotsResultSchema.parse(await (await app.request(`/v1/slots?${query}`)).json());
-    const optional = slotsResultSchema.parse(await (await app.request(`/v1/slots?${query}&optional=America/New_York`)).json());
+describe("optional attendees over HTTP", () => {
+  it("accepts optional zones on GET and POST", async () => {
+    const query =
+      "zones=Europe/London,Asia/Dhaka,America/New_York&date=2026-11-02&days=1&step=60&top=50";
+    const required = slotsResultSchema.parse(
+      await (await app.request(`/v1/slots?${query}`)).json(),
+    );
+    const optional = slotsResultSchema.parse(
+      await (
+        await app.request(`/v1/slots?${query}&optional=America/New_York`)
+      ).json(),
+    );
     expect(optional.slots.length).toBeGreaterThan(required.slots.length);
-    expect(optional.slots.some(slot => slot.zones[2]!.classification === 'blocked' && slot.zones[2]!.optional)).toBe(true);
-    const posted = slotsResultSchema.parse(await (await post({ zones: [{ id: 'Europe/London' }, { id: 'America/New_York', optional: true }], startDate: '2026-11-02', days: 1 })).json());
+    expect(
+      optional.slots.some(
+        (slot) =>
+          slot.zones[2]!.classification === "blocked" &&
+          slot.zones[2]!.optional,
+      ),
+    ).toBe(true);
+    const posted = slotsResultSchema.parse(
+      await (
+        await post({
+          zones: [
+            { id: "Europe/London" },
+            { id: "America/New_York", optional: true },
+          ],
+          startDate: "2026-11-02",
+          days: 1,
+        })
+      ).json(),
+    );
     expect(posted.slots[0]!.zones[1]!.optional).toBe(true);
   });
 });
 
-describe('cron conversion over HTTP', () => {
-  const convert = (query: Record<string, string>) => app.request(`/v1/cron/convert?${new URLSearchParams(query)}`);
+describe("cron conversion over HTTP", () => {
+  const convert = (query: Record<string, string>) =>
+    app.request(`/v1/cron/convert?${new URLSearchParams(query)}`);
 
-  it('converts syntax and time zone, matching core', async () => {
-    const response = await convert({ expression: '0 9 * * 1-5', to: 'quartz', zone: 'Asia/Dhaka', toZone: 'UTC', from: '2026-10-23T00:00:00Z' });
+  it("converts syntax and time zone, matching core", async () => {
+    const response = await convert({
+      expression: "0 9 * * 1-5",
+      to: "quartz",
+      zone: "Asia/Dhaka",
+      toZone: "UTC",
+      from: "2026-10-23T00:00:00Z",
+    });
     expect(response.status).toBe(200);
     const body = cronConvertResultSchema.parse(await response.json());
-    expect(body.dialect!.expressions).toEqual(['0 0 9 ? * MON-FRI']);
-    expect(body.zone).toEqual(convertCronZone({ expression: '0 9 * * 1-5', fromZone: 'Asia/Dhaka', toZone: 'UTC', from: '2026-10-23T00:00:00Z' }));
+    expect(body.dialect!.expressions).toEqual(["0 0 9 ? * MON-FRI"]);
+    expect(body.zone).toEqual(
+      convertCronZone({
+        expression: "0 9 * * 1-5",
+        fromZone: "Asia/Dhaka",
+        toZone: "UTC",
+        from: "2026-10-23T00:00:00Z",
+      }),
+    );
   });
 
-  it('returns only what was asked for', async () => {
-    const body = cronConvertResultSchema.parse(await (await convert({ expression: '0 0 0 13 * FRI', dialect: 'spring', to: 'unix' })).json());
+  it("returns only what was asked for", async () => {
+    const body = cronConvertResultSchema.parse(
+      await (
+        await convert({
+          expression: "0 0 0 13 * FRI",
+          dialect: "spring",
+          to: "unix",
+        })
+      ).json(),
+    );
     expect(body.zone).toBeUndefined();
-    expect(body.dialect).toMatchObject({ expressions: [], problems: [expect.stringContaining("can't require both")] });
+    expect(body.dialect).toMatchObject({
+      expressions: [],
+      problems: [expect.stringContaining("can't require both")],
+    });
   });
 
   it.each([
-    [{ expression: '0 9 * * *' }, 'to'],
-    [{ expression: '0 9 * * *', to: 'cronie' }, 'to'],
-    [{ expression: '0 99 * * *', to: 'quartz' }, 'expression.hour'],
-    [{ expression: '0 9 * * *', toZone: 'Mars/Base' }, 'toZone']
-  ])('rejects %j', async (query, field) => {
+    [{ expression: "0 9 * * *" }, "to"],
+    [{ expression: "0 9 * * *", to: "cronie" }, "to"],
+    [{ expression: "0 99 * * *", to: "quartz" }, "expression.hour"],
+    [{ expression: "0 9 * * *", toZone: "Mars/Base" }, "toZone"],
+  ])("rejects %j", async (query, field) => {
     const error = await publicError(await convert(query));
     expect(error.details).toContainEqual(expect.objectContaining({ field }));
+  });
+});
+
+describe("plain-English cron over HTTP", () => {
+  it("translates text, matching core", async () => {
+    const response = await app.request(
+      `/v1/cron/natural?${new URLSearchParams({ text: "every weekday at 9am Dhaka", dialect: "kubernetes" })}`,
+    );
+    expect(response.status).toBe(200);
+    const body = cronNaturalResultSchema.parse(await response.json());
+    expect(body).toEqual(
+      parseNaturalCron("every weekday at 9am Dhaka", { dialect: "kubernetes" }),
+    );
+    expect(body).toMatchObject({
+      expressions: ["0 9 * * 1-5"],
+      zone: "Asia/Dhaka",
+    });
+  });
+
+  it("returns problems for text it can't translate, and validates input", async () => {
+    const body = cronNaturalResultSchema.parse(
+      await (
+        await app.request("/v1/cron/natural?text=every+other+monday")
+      ).json(),
+    );
+    expect(body.expressions).toEqual([]);
+    expect(body.problems[0]).toContain("every other monday");
+    expect(
+      (await publicError(await app.request("/v1/cron/natural"))).details,
+    ).toContainEqual(expect.objectContaining({ field: "text" }));
+  });
+});
+
+describe("recurring series as .ics over HTTP", () => {
+  it("returns the weekly series as a calendar file", async () => {
+    const response = await app.request(
+      "/v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=10&format=ics",
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/calendar");
+    expect(response.headers.get("Content-Disposition")).toBe(
+      'attachment; filename="tzmeet-weekly-2026-10-12.ics"',
+    );
+    const text = await response.text();
+    expect(text).toContain("DTSTART;TZID=Europe/London:20261012T140000\r\n");
+    expect(text).toContain("RRULE:FREQ=WEEKLY;COUNT=10\r\n");
+    expect(text).toContain(
+      `DTSTAMP:${clock().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+    );
   });
 });

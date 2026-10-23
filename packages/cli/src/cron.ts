@@ -5,6 +5,7 @@ import {
   type CronExplanation,
   type CronRunNote,
   type CronZoneConversion,
+  type NaturalCron,
 } from "@tzmeet/core";
 
 export const defaultCronZones = [
@@ -133,4 +134,21 @@ export function formatConversion(converted: {
     );
   }
   return lines.join("\n");
+}
+
+export function formatNatural(natural: NaturalCron): string {
+  const lines = [
+    `Understood "${natural.input}" as:`,
+    ...natural.expressions.map(
+      (expression) =>
+        `  ${expression}${natural.zone ? `  (${natural.zone})` : ""}`,
+    ),
+  ];
+  lines.push(...natural.notes.map((note) => `  i ${note}`));
+  if (natural.native)
+    lines.push(
+      "  Set the time zone in the scheduler:",
+      ...natural.native.split("\n").map((line) => `    ${line}`),
+    );
+  return `${lines.join("\n")}\n\n`;
 }

@@ -138,7 +138,6 @@ function checkWindows(
     });
     return;
   }
-  // Measure clockwise from the start of the allowed window so overnight windows compare correctly.
   const from = clockMinutes(hours.quietBefore);
   const allowed = minutesAhead(from, clockMinutes(hours.quietAfter));
   const workStart = minutesAhead(from, clockMinutes(hours.workStart));
@@ -166,7 +165,6 @@ const zoneObject = z
     holidayPreset: z.enum(holidayPresetIds).optional(),
     busy: z.array(busyIntervalSchema).max(5000).optional(),
     specialHours: z.array(specialHoursSchema).max(24).optional(),
-    /** Optional attendees never block a slot; slots they can attend rank higher. */
     optional: z.boolean().optional(),
     prayer: prayerSchema.optional(),
   })

@@ -18,7 +18,6 @@ export default {
           clientIp: (req) => req.headers.get("CF-Connecting-IP") ?? undefined,
         });
       } catch {
-        // Fail closed through the regular JSON/security/logging middleware rather
         app = createApp({
           now: () => {
             throw new Error("Invalid Worker configuration");

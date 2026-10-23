@@ -5,6 +5,8 @@ import {
   convertCronZone,
   cronDialectName,
   cronDialects,
+  looksLikeNaturalCron,
+  parseNaturalCron,
   detectDialect,
   explainCron,
   listTimeZones,
@@ -23,9 +25,15 @@ import {
   fieldLabels,
   maxDisplayZones,
   parseCronHash,
-  type CronState, cronShareLink } from "./cron-state";
+  type CronState,
+  cronShareLink,
+} from "./cron-state";
 
 const examples: { label: string; state: Partial<CronState> }[] = [
+  {
+    label: "In plain English",
+    state: { expression: "every weekday at 9am Dhaka", dialect: "auto" },
+  },
   {
     label: "Nightly 02:30, New York",
     state: {
@@ -92,15 +100,32 @@ export default function CronPage({
     window.history.replaceState(window.history.state, "", url);
   }, [state]);
 
-  const dialect = state.dialect === "auto" ? undefined : state.dialect;
+  const natural = useMemo(
+    () =>
+      looksLikeNaturalCron(state.expression)
+        ? parseNaturalCron(state.expression, {
+            dialect: state.dialect === "auto" ? "unix" : state.dialect,
+          })
+        : null,
+    [state.expression, state.dialect],
+  );
+  const expression = natural?.expressions[0] ?? state.expression;
+  const scheduleZone = natural?.zone ?? state.zone;
+  const dialect = natural
+    ? natural.dialect
+    : state.dialect === "auto"
+      ? undefined
+      : state.dialect;
   const parsed = useMemo(
-    () => parseCron(state.expression, dialect),
-    [state.expression, dialect],
+    () => parseCron(expression, dialect),
+    [expression, dialect],
   );
   const explained = useMemo((): {
     result: CronExplanation | null;
     errors: string[];
   } => {
+    if (natural && !natural.expressions.length)
+      return { result: null, errors: natural.problems };
     if (!parsed.ok)
       return {
         result: null,
@@ -109,9 +134,9 @@ export default function CronPage({
     try {
       return {
         result: explainCron({
-          expression: state.expression,
+          expression,
           dialect,
-          zone: state.zone,
+          zone: scheduleZone,
           from,
           count: state.count,
           displayZones: state.display,
@@ -127,16 +152,20 @@ export default function CronPage({
             : ["This expression could not be explained."],
       };
     }
-  }, [parsed, state, dialect, from]);
+  }, [natural, parsed, state, expression, scheduleZone, dialect, from]);
   const result = explained.result;
 
-  const tokens = state.expression.trim().startsWith("@")
-    ? []
-    : state.expression
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .filter((token, index) => index > 0 || !/^(?:CRON_)?TZ=/i.test(token));
+  const tokens =
+    expression.trim().startsWith("@") ||
+    (natural && !natural.expressions.length)
+      ? []
+      : expression
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .filter(
+            (token, index) => index > 0 || !/^(?:CRON_)?TZ=/i.test(token),
+          );
   const badFields = new Set<string>(
     parsed.ok ? [] : parsed.errors.map((error) => error.field),
   );
@@ -181,10 +210,35 @@ export default function CronPage({
                 aria-label="Cron expression"
                 spellCheck={false}
                 autoComplete="off"
+                placeholder="0 9 * * 1-5, or: every weekday at 9am Dhaka"
                 value={state.expression}
                 onChange={(event) => update({ expression: event.target.value })}
               />
             </label>
+            {natural && natural.expressions.length > 0 && (
+              <div className="natural-banner" role="status">
+                <span>
+                  Understood as <code>{natural.expressions.join("  +  ")}</code>
+                  {natural.zone ? ` in ${natural.zone}` : ""}
+                </span>
+                {natural.notes.map((note) => (
+                  <small key={note}>{note}</small>
+                ))}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() =>
+                    update({
+                      expression: natural.expressions[0]!,
+                      dialect: natural.dialect,
+                      ...(natural.zone ? { zone: natural.zone } : {}),
+                    })
+                  }
+                >
+                  Use as cron
+                </button>
+              </div>
+            )}
             {tokens.length > 0 && (
               <ol className="cron-chips" aria-label="Fields">
                 {tokens.map((token, index) => (
@@ -425,7 +479,7 @@ export default function CronPage({
                 </div>
               )}
               <ConvertPanel
-                expression={state.expression}
+                expression={result.expression}
                 dialect={result.dialect}
                 zone={result.zone}
                 from={from}
@@ -488,7 +542,7 @@ function TimeCell({
   );
 }
 
-function ZoneInput({
+export function ZoneInput({
   label,
   zones,
   value,
@@ -553,7 +607,6 @@ function ZoneInput({
   );
 }
 
-/** Convert the expression to another syntax, or for a server in another time zone. */
 function ConvertPanel({
   expression,
   dialect,
@@ -574,8 +627,19 @@ function ConvertPanel({
   const converted = useMemo(() => {
     try {
       return {
-        dialect: target ? convertCronDialect(expression, { from: dialect, to: target }) : null,
-        zone: serverZone && serverZone !== zone ? convertCronZone({ expression, dialect, fromZone: zone, toZone: serverZone, from }) : null,
+        dialect: target
+          ? convertCronDialect(expression, { from: dialect, to: target })
+          : null,
+        zone:
+          serverZone && serverZone !== zone
+            ? convertCronZone({
+                expression,
+                dialect,
+                fromZone: zone,
+                toZone: serverZone,
+                from,
+              })
+            : null,
       };
     } catch {
       return { dialect: null, zone: null };
@@ -584,7 +648,12 @@ function ConvertPanel({
   const copyable = (text: string) => (
     <div key={text} className="convert-expression">
       <code>{text}</code>
-      <button type="button" className="text-button" aria-label={`Copy ${text}`} onClick={() => void copy(text, "Expression copied.")}>
+      <button
+        type="button"
+        className="text-button"
+        aria-label={`Copy ${text}`}
+        onClick={() => void copy(text, "Expression copied.")}
+      >
         Copy
       </button>
     </div>
@@ -595,26 +664,43 @@ function ConvertPanel({
       <div className="field-pair">
         <label>
           To syntax
-          <select aria-label="Convert to syntax" value={target} onChange={(event) => setTarget(event.target.value as CronDialect | "")}>
+          <select
+            aria-label="Convert to syntax"
+            value={target}
+            onChange={(event) =>
+              setTarget(event.target.value as CronDialect | "")
+            }
+          >
             <option value="">Choose…</option>
-            {cronDialects.filter((name) => name !== dialect).map((name) => (
-              <option key={name} value={name}>
-                {cronDialectName(name)}
-              </option>
-            ))}
+            {cronDialects
+              .filter((name) => name !== dialect)
+              .map((name) => (
+                <option key={name} value={name}>
+                  {cronDialectName(name)}
+                </option>
+              ))}
           </select>
         </label>
-        <ZoneInput label="Server time zone" zones={zones} value={serverZone} onPick={setServerZone} />
+        <ZoneInput
+          label="Server time zone"
+          zones={zones}
+          value={serverZone}
+          onPick={setServerZone}
+        />
       </div>
       {converted.dialect && (
         <div className="convert-result">
           <strong>{cronDialectName(converted.dialect.to)}</strong>
           {converted.dialect.expressions.map(copyable)}
           {converted.dialect.problems.map((problem) => (
-            <p key={problem} className="convert-problem">{problem}</p>
+            <p key={problem} className="convert-problem">
+              {problem}
+            </p>
           ))}
           {converted.dialect.notes.map((note) => (
-            <p key={note} className="detail-hint">{note}</p>
+            <p key={note} className="detail-hint">
+              {note}
+            </p>
           ))}
         </div>
       )}
@@ -624,14 +710,23 @@ function ConvertPanel({
           <p className="detail-hint">{converted.zone.message}</p>
           {converted.zone.periods.map((period) => (
             <div key={period.from} className="convert-period">
-              <span>{converted.zone!.constant ? "All year" : `${period.from} to ${period.to}`}</span>
+              <span>
+                {converted.zone!.constant
+                  ? "All year"
+                  : `${period.from} to ${period.to}`}
+              </span>
               {period.expressions.map(copyable)}
               {period.problems.map((problem) => (
-                <p key={problem} className="convert-problem">{problem}</p>
+                <p key={problem} className="convert-problem">
+                  {problem}
+                </p>
               ))}
             </div>
           ))}
-          <p className="detail-hint">Recommended: keep the schedule and set the scheduler's time zone, which stays right through daylight saving.</p>
+          <p className="detail-hint">
+            Recommended: keep the schedule and set the scheduler's time zone,
+            which stays right through daylight saving.
+          </p>
           <pre className="convert-native">{converted.zone.native}</pre>
         </div>
       )}

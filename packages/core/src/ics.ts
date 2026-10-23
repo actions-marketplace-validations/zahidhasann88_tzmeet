@@ -262,7 +262,6 @@ function parseRule(text: string, start: When): Rule | string {
   if (parts.UNTIL) {
     const parsed = parseWhen(parts.UNTIL, {}, start.zone);
     if (!parsed || parsed === "zone") return `UNTIL=${parts.UNTIL}`;
-    // A date-only UNTIL includes that whole day.
     until = parsed.allDay ? parsed.millis + day - 1 : parsed.millis;
   }
   const numbers = (value?: string) =>
@@ -350,7 +349,6 @@ function expand(start: When, rule: Rule, end: number): number[] {
         }
       }
     }
-    // BYDAY / BYMONTHDAY narrow DAILY rules; BYMONTH narrows daily, weekly and monthly ones.
     if (rule.freq === "DAILY" && rule.byDay.length)
       dates = dates.filter((date) =>
         rule.byDay.some((entry) => entry.weekday === date.weekday),

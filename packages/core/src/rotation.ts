@@ -71,7 +71,6 @@ export function fairRotation(
       `There aren't enough different times to rotate between, so ${best.time} ${anchor} is the best single time.`,
     );
 
-  // Lexicographic: worst-off zone's count, then total, then rank (lower is better).
   const better = (x: number[], y: number[]) => {
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i]! < y[i]!;
     return false;
@@ -106,7 +105,6 @@ export function fairRotation(
       0,
     ),
   }));
-  // Compare with always meeting at the top-ranked time.
   const helped = turns.filter(
     (zone, index) => zone.inconvenientTurns < best.burden[index]! * size,
   );

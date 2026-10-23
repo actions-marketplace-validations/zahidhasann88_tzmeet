@@ -110,14 +110,10 @@ export const resultQuerySchema = z
       .enum(["json", "text", "ics"])
       .default("json")
       .openapi({ example: "json" }),
-    rotation: z
-      .enum(["2", "3"])
-      .optional()
-      .openapi({
-        description:
-          "Also suggest 2 or 3 times to alternate weekly (JSON only)",
-        example: "2",
-      }),
+    rotation: z.enum(["2", "3"]).optional().openapi({
+      description: "Also suggest 2 or 3 times to alternate weekly (JSON only)",
+      example: "2",
+    }),
   })
   .strict();
 export const slotsGetQuerySchema = resultQuerySchema.extend({
@@ -221,7 +217,6 @@ export const zoneSlotSchema = z.object({
   localEnd: z.string(),
   formattedStart: z.string(),
   formattedEnd: z.string(),
-  /** "blocked" only for optional zones, which never stop a slot. */
   classification: z.enum(["ideal", "acceptable", "blocked"]),
   optional: z.boolean().optional(),
 });
@@ -397,6 +392,14 @@ export const recurringQuerySchema = slotsGetQuerySchema
       description: "Meeting time (HH:mm) in the first zone",
     }),
     weeks,
+    format: z
+      .enum(["json", "ics"])
+      .default("json")
+      .openapi({
+        example: "json",
+        description:
+          "json report, or ics: the weekly series as a calendar file",
+      }),
   });
 const recurringZoneSchema = z.object({
   id: z.string(),
@@ -454,37 +457,25 @@ export const cronConvertQuerySchema = z
       .min(1, "expression is required")
       .max(200, "expression must be at most 200 characters")
       .openapi({ example: "0 9 * * 1-5" }),
-    dialect: dialectEnum
-      .optional()
-      .openapi({
-        example: "unix",
-        description: "Source syntax (default: detected)",
-      }),
+    dialect: dialectEnum.optional().openapi({
+      example: "unix",
+      description: "Source syntax (default: detected)",
+    }),
     to: dialectEnum
       .optional()
       .openapi({ example: "quartz", description: "Convert to this syntax" }),
-    zone: z
-      .string()
-      .optional()
-      .openapi({
-        example: "Asia/Dhaka",
-        description: "Zone the schedule is meant for (default: UTC)",
-      }),
-    toZone: z
-      .string()
-      .optional()
-      .openapi({
-        example: "UTC",
-        description:
-          "Rewrite the schedule for a scheduler running in this zone",
-      }),
-    from: z
-      .string()
-      .optional()
-      .openapi({
-        example: "2026-10-23T00:00:00Z",
-        description: "Start of the year checked for DST changes (default: now)",
-      }),
+    zone: z.string().optional().openapi({
+      example: "Asia/Dhaka",
+      description: "Zone the schedule is meant for (default: UTC)",
+    }),
+    toZone: z.string().optional().openapi({
+      example: "UTC",
+      description: "Rewrite the schedule for a scheduler running in this zone",
+    }),
+    from: z.string().optional().openapi({
+      example: "2026-10-23T00:00:00Z",
+      description: "Start of the year checked for DST changes (default: now)",
+    }),
   })
   .strict()
   .refine((query) => query.to !== undefined || query.toZone !== undefined, {
@@ -522,3 +513,30 @@ export const cronConvertResultSchema = z
     zone: zoneConversionSchema.optional(),
   })
   .openapi("CronConversion");
+export const cronNaturalQuerySchema = z
+  .object({
+    text: z
+      .string()
+      .min(1, "text is required")
+      .max(200, "text must be at most 200 characters")
+      .openapi({ example: "every weekday at 9am Dhaka" }),
+    dialect: dialectEnum
+      .optional()
+      .openapi({
+        example: "kubernetes",
+        description: "Syntax to write (default: unix)",
+      }),
+  })
+  .strict();
+export const cronNaturalResultSchema = z
+  .object({
+    input: z.string(),
+    dialect: dialectEnum,
+    expressions: z.array(z.string()),
+    zone: z.string().optional(),
+    description: z.string(),
+    native: z.string().optional(),
+    problems: z.array(z.string()),
+    notes: z.array(z.string()),
+  })
+  .openapi("NaturalCron");

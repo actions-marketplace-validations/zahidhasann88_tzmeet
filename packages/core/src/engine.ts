@@ -406,7 +406,6 @@ export function findSlots(input: FindSlotsInput): FindSlotsResult {
     let blocked = false;
     classified.forEach((evaluation, i) => {
       const zone = normalized.zones[i]!;
-      // Optional zones never block, and don't count towards the diagnostics.
       if (zone.optional) return;
       if (evaluation.classification === "blocked") blocked = true;
       for (const constraint of evaluation.constraints) {

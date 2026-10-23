@@ -3,6 +3,7 @@ import {
   explainCron,
   convertCronDialect,
   convertCronZone,
+  parseNaturalCron,
   findSlots,
   getTimeZoneInfo,
   recurringImpact,
@@ -66,6 +67,9 @@ export function responseExamples(version: string) {
         from: "2026-10-23T00:00:00Z",
       }),
     },
+    cronNatural: parseNaturalCron("every weekday at 9am Dhaka", {
+      dialect: "kubernetes",
+    }),
     health: { status: "ok", version },
   };
 }

@@ -67,7 +67,6 @@ function locateChange(
   return high;
 }
 
-/** Instants for a civil time given as naive UTC millis; `change` is set when it falls in a gap. */
 export function resolveWall(
   tz: IANAZone,
   naive: number,
@@ -129,7 +128,6 @@ export function listTransitions(
   }));
 }
 
-/** Offset changes in [start, end) as millis; assumes changes are more than a day apart. */
 export function scanTransitions(
   tz: IANAZone,
   start: number,

@@ -132,17 +132,14 @@ function hijriDate(millis: number): { month: number; day: number } | null {
   };
 }
 
-// [name, Hijri month, Hijri day, days before, days after]
 type IslamicRule = [string, number, number, number, number];
 
-/** Islamic holidays from the Umm al-Qura calendar, moved by `shift` days; all approximate. */
 function islamicHolidays(
   year: number,
   rules: IslamicRule[],
   shift: number,
 ): Holiday[] {
   const list: Holiday[] = [];
-  // Scan a little either side so holidays spanning New Year are found.
   for (
     let t = utc(year, 1, 1) - 5 * day;
     t <= utc(year, 12, 31) + 5 * day;
@@ -177,14 +174,9 @@ const fixedDates = (
     approximate: false,
   }));
 
-/**
- * Holidays from yearly government lists, for festivals on lunisolar calendars that
- * can't be calculated here. [date, name, approximate]
- */
 const yearly: Partial<
   Record<HolidayPreset, Record<number, [string, string, boolean][]>>
 > = {
-  // Bangladesh Bank and government lists for 2026.
   BD: {
     2026: [
       ["2026-05-01", "Buddha Purnima", false],
@@ -193,8 +185,6 @@ const yearly: Partial<
       ["2026-10-21", "Durga Puja (Bijoya Dashami)", false],
     ],
   },
-  // DoPT gazetted holidays for central government offices in Delhi/New Delhi:
-  // O.M. of 3 July 2025 (2026) and 16 July 2026 (2027). Islamic dates are tentative.
   IN: {
     2026: [
       ["2026-01-26", "Republic Day", false],
@@ -243,12 +233,10 @@ const fromList = (preset: HolidayPreset, year: number): Holiday[] =>
     approximate,
   }));
 
-/** Years covered by a yearly government list, for presets that need one. */
 export function holidayListYears(preset: HolidayPreset): number[] {
   return Object.keys(yearly[preset] ?? {}).map(Number);
 }
 
-/** A note when a preset can't include everything for this year, else null. */
 export function presetNote(preset: HolidayPreset, year: number): string | null {
   const years = holidayListYears(preset);
   if (!years.length || years.includes(year)) return null;

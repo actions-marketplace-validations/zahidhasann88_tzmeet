@@ -24,6 +24,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a time |
 | `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring or Quartz): next runs and DST warnings |
 | `GET /v1/cron/convert?expression=0 9 * * 1-5&to=quartz&zone=Asia/Dhaka&toZone=UTC` | Convert a cron expression to another syntax and/or a server's time zone |
+| `GET /v1/cron/natural?text=every weekday at 9am Dhaka&dialect=kubernetes` | Turn plain English into a cron expression |
 | `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |
 | `GET /v1/health` | Health check |
 | `GET /docs` | Interactive docs |
@@ -32,7 +33,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 
 `/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|IN|PK|AE|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone). POST zones also accept `busy: [{ start, end }]` intervals (ISO instants) to block calendar busy times.
 
-Both also accept repeatable `specialHours=IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` and `ramadan=IANA_ZONE=HH:mm-HH:mm` for different work hours (POST zones use `specialHours`). Repeat `optional=IANA_ZONE` (or set `optional: true` on a POST zone) for attendees who shouldn't block a time. Add `rotation=2` or `3` to `/v1/slots` to get a `rotation` suggestion: times to alternate weekly so no city always gets the inconvenient slot.
+Both also accept repeatable `specialHours=IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` and `ramadan=IANA_ZONE=HH:mm-HH:mm` for different work hours (POST zones use `specialHours`). Repeat `optional=IANA_ZONE` (or set `optional: true` on a POST zone) for attendees who shouldn't block a time. Add `format=ics` to `/v1/recurring` to get the weekly series as a calendar file. Add `rotation=2` or `3` to `/v1/slots` to get a `rotation` suggestion: times to alternate weekly so no city always gets the inconvenient slot.
 
 ## Examples
 

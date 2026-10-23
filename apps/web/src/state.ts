@@ -42,7 +42,6 @@ export function initials(label: string): string {
   return letters.join("").toUpperCase();
 }
 
-/** New zone with core defaults, including the regional weekend (e.g. Fri/Sat for Dhaka). */
 export function regionalZone(id: string): NormalizedInput["zones"][number] {
   return zoneSchema.parse({ id, label: friendlyName(id) });
 }
@@ -114,7 +113,6 @@ function fromBase64Url(value: string): string {
   );
 }
 
-/** A zone as just its id when it matches the defaults, else only the fields that differ. */
 function compactZone(zone: Zone): string | Record<string, unknown> {
   const base = regionalZone(zone.id) as Record<string, unknown>;
   const changed = Object.fromEntries(
@@ -126,10 +124,6 @@ function compactZone(zone: Zone): string | Record<string, unknown> {
   return Object.keys(changed).length ? { id: zone.id, ...changed } : zone.id;
 }
 
-/**
- * Version 2 share format: settings that differ from the defaults, as base64url JSON in
- * `?s=`. Much shorter than the full state; zone order and every setting still round-trip.
- */
 function compactState(state: WebState): Record<string, unknown> {
   const { zones, startDate, ...rest } = state.input;
   const input: Record<string, unknown> = {
@@ -185,13 +179,12 @@ function expandState(value: unknown): unknown {
   };
 }
 
-/** Compact `s=` share parameter (see compactState). */
 export function encodeState(state: WebState): string {
   return new URLSearchParams({
     s: toBase64Url(JSON.stringify(compactState(parseState(state)))),
   }).toString();
 }
-/** Reads `?s=` links and older `?state=` (full JSON) links. */
+
 export function decodeState(search: string): WebState | null {
   const params = new URLSearchParams(search);
   const compact = params.get("s");
@@ -204,7 +197,6 @@ export function decodeState(search: string): WebState | null {
   return parseState(JSON.parse(raw) as unknown);
 }
 
-/** URL wins over storage. Storage and URL errors never make the app unusable. */
 export function restoreState(
   search: string,
   storage: Pick<Storage, "getItem"> | null,

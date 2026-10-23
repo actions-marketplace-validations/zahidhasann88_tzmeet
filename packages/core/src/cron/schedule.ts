@@ -24,8 +24,6 @@ function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
         : { gap: "skip", fold: "twice" };
     case "kubernetes":
       return { gap: "skip", fold: "twice" };
-    // Checked by running CronExpression.next() on Spring 6.2.19 and 7.0.10 (October
-    // 2026): a time in the repeated hour runs twice, a time in the skipped hour not at all.
     case "spring":
       return { gap: "skip", fold: "twice" };
     case "quartz":

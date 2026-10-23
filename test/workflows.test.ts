@@ -26,7 +26,7 @@ interface Workflow {
   concurrency: { group: string; "cancel-in-progress": boolean };
   jobs: Record<string, Job>;
 }
-/** True when a step uses the given action at any version, so Dependabot bumps don't break these checks. */
+
 const uses = (step: Step, action: string) =>
   step.uses?.startsWith(`${action}@`) ?? false;
 
@@ -39,7 +39,6 @@ function workflow(file: string): Workflow {
   return document.toJS() as Workflow;
 }
 
-// These regression checks complement actionlint; hosted-runner execution still requires GitHub.
 describe("CI and deployment contracts", () => {
   it("ships exactly three well-formed workflows", () => {
     expect(

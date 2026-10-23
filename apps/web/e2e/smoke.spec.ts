@@ -49,7 +49,6 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
   await page.getByLabel("Days to search").fill("3");
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
   await expect(page.locator(".slot-card").first()).toBeVisible();
-  // Slot searches run in a Web Worker, off the main thread.
   expect(page.workers().length).toBeGreaterThan(0);
   await page
     .getByRole("button", { name: "Select slot 2", exact: true })
@@ -60,7 +59,6 @@ test("add/search/reorder zones, pick date, see results, and round-trip exact URL
     () => document.documentElement.dataset.clipboard!,
   );
   const original = decodeState(new URL(share).search)!;
-  // Compact share format: only settings that differ from the defaults.
   expect(new URL(share).searchParams.has("s")).toBe(true);
   const legacy = new URLSearchParams({
     state: JSON.stringify(original),
@@ -643,4 +641,106 @@ test("converts a cron schedule to another syntax and server time zone", async ({
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("understands a cron schedule written in plain English", async ({
+  page,
+}) => {
+  await page.goto("./#/cron");
+  await page.getByLabel("Cron expression").fill("every weekday at 9am Dhaka");
+  const banner = page.locator(".natural-banner");
+  await expect(banner).toContainText("Understood as 0 9 * * 1-5 in Asia/Dhaka");
+  await expect(
+    page.getByRole("heading", { name: "At 09:00, Monday through Friday" }),
+  ).toBeVisible();
+  await expect(page.locator(".cron-table thead")).toContainText("Dhaka");
+  await page
+    .getByRole("region", { name: "Convert" })
+    .getByLabel("Convert to syntax")
+    .selectOption("quartz");
+  await expect(page.locator(".convert-expression code").first()).toHaveText(
+    "0 0 9 ? * MON-FRI",
+  );
+  await banner.getByRole("button", { name: "Use as cron" }).click();
+  await expect(page.getByLabel("Cron expression")).toHaveValue("0 9 * * 1-5");
+  await page.getByLabel("Cron expression").fill("every other monday at 9am");
+  await expect(page.getByRole("alert")).toContainText(
+    'Cron can\'t do "every other monday"',
+  );
+});
+
+test.describe("working-hours page", () => {
+  test.use({ timezoneId: "Europe/London" });
+
+  test("shows someone's hours in the viewer's time zone", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-10-23T09:35:00Z"));
+    await page.goto("./me/#n=Zahid&z=Asia%2FDhaka&w=09:00-18:00&d=56&h=BD");
+    await expect(
+      page.getByRole("heading", { name: "When Zahid is available." }),
+    ).toBeVisible();
+    const status = page.locator(".me-status");
+    await expect(status).toContainText("Zahid is off right now");
+    await expect(status).toContainText("It's Fri 15:35 in Dhaka.");
+    await expect(status).toContainText(
+      "Next working time: Sun 25 Oct, 03:00 your time (Sun 09:00 in Dhaka).",
+    );
+    await expect(page.locator(".me-grid tbody tr")).toHaveCount(7);
+    await expect(page.getByLabel("Your time zone (viewer)")).toHaveValue(
+      "Europe/London",
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const audit = await new AxeBuilder({ page })
+      .include("main")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(audit.violations).toEqual([]);
+  });
+
+  test("builds and copies a link that opens in viewer mode", async ({
+    page,
+    context,
+  }) => {
+    await mockClipboard(page);
+    await page.goto("./#/me");
+    await page.getByLabel("Your name").fill("Zahid");
+    await page.getByLabel("Your time zone", { exact: true }).fill("Asia/Dhaka");
+    await expect(page.getByLabel("Fri weekend")).toBeChecked();
+    await expect(page.getByLabel("Public holidays")).toHaveValue("BD");
+    await page.getByRole("button", { name: "Copy your link" }).click();
+    const link = await page.evaluate(
+      () => document.documentElement.dataset.clipboard!,
+    );
+    expect(new URL(link).pathname.endsWith("/me/")).toBe(true);
+    const opened = await context.newPage();
+    await opened.goto(link);
+    await expect(
+      opened.getByRole("heading", { name: "When Zahid is available." }),
+    ).toBeVisible();
+    await expect(opened.getByLabel("Your name")).toHaveCount(0);
+  });
+});
+
+test("downloads a meeting as a weekly calendar series", async ({ page }) => {
+  await open(page);
+  await page
+    .getByRole("button", {
+      name: "Check slot 1 over the coming weeks",
+      exact: true,
+    })
+    .click();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download weekly series (.ics)" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(
+    /^tzmeet-weekly-2026-11-\d\d\.ics$/,
+  );
+  const text = await readFile((await download.path())!, "utf8");
+  expect(text).toContain("RRULE:FREQ=WEEKLY;COUNT=26");
+  expect(text).toContain("DTSTART;TZID=Asia/Dhaka:");
+  expect(text).toContain("BEGIN:VTIMEZONE");
 });

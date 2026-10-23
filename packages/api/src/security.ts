@@ -20,7 +20,6 @@ export interface AppOptions {
   apiKeys?: readonly string[];
   corsOrigins?: readonly string[];
   rateLimit?: { limit?: number; windowMs?: number; maxBuckets?: number };
-  /** Only adapters should derive an IP from trusted platform/socket information. */
   clientIp?: (
     request: Request,
     bindings: Record<string, unknown>,
@@ -108,8 +107,6 @@ export function safetyMiddleware(
   if (keys.some((key) => key.length === 0))
     throw new Error("apiKeys must not contain empty keys");
   const verify = keyVerifier(keys);
-  // No timers, payload storage or raw IP retention. Expired hashed counters are swept
-  // on requests; full maps use one shared overflow bucket rather than evicting limits.
   const buckets = new Map<string, { count: number; reset: number }>();
   const log = options.log ?? ((entry) => console.info(JSON.stringify(entry)));
   const observed: MiddlewareHandler<ApiEnv> = async (c, next) => {
@@ -169,7 +166,6 @@ export function safetyMiddleware(
     await next();
   };
   const auth: MiddlewareHandler<ApiEnv> = async (c, next) => {
-    // Health/docs are deliberately public. Health still shares the rate limiter.
     if (
       !keys.length ||
       !["/v1/slots", "/v1/zones", "/v1/convert"].includes(c.req.path)
@@ -220,7 +216,6 @@ export function safetyMiddleware(
   ];
 }
 
-/** Read actual stream bytes even if Content-Length is absent or dishonest. */
 export const boundedBody: MiddlewareHandler<ApiEnv> = async (c, next) => {
   const tooLarge = () =>
     new ApiError(

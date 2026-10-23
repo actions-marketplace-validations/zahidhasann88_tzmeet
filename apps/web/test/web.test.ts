@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  availabilityGrid,
+  meHash,
+  meShareLink,
+  nextWorkingTime,
+  parseMeHash,
+  statusNow,
+  upcomingHolidays,
+  type MeState,
+} from "../src/me-state";
+import {
   classifySpan,
   classifySpans,
   findSlots,
@@ -149,7 +159,6 @@ describe("shareable and persistent state", () => {
         startDate: "2026-12-16",
       },
     }).input;
-    // 00:00 UTC is 06:00 on the 16th in Dhaka; the holiday covers the rest of the UTC day.
     const kinds = makeTimeline(input, "2026-12-16")[0]!.segments.map(
       (segment) => segment.kind,
     );
@@ -243,7 +252,7 @@ describe("shared full-span timeline evaluation", () => {
     );
     expect(
       rows[2]!.segments.some((segment) => segment.kind === "weekend"),
-    ).toBe(true); // NY is still Sunday at 00:00 UTC.
+    ).toBe(true);
     expect(rows[0]!.origin).toContain("06:00");
   });
 });
@@ -464,7 +473,87 @@ describe("cron share links", () => {
     expect(link.startsWith("https://example.github.io/tzmeet/cron/#e=")).toBe(
       true,
     );
-    // The /cron/ page forwards to "../#/cron?" + everything after "#".
     expect(parseCronHash(`#/cron?${link.split("#")[1]}`)).toEqual(state);
+  });
+});
+
+describe("working-hours links", () => {
+  const zahid: MeState = {
+    name: "Zahid",
+    zone: "Asia/Dhaka",
+    workStart: "09:00",
+    workEnd: "18:00",
+    weekend: [5, 6],
+    holidayPreset: "BD",
+  };
+
+  it("round-trip through the URL hash and the /me/ preview page", () => {
+    expect(parseMeHash(meHash(zahid))).toEqual(zahid);
+    const link = meShareLink(zahid, "https://example.github.io/tzmeet/#/me");
+    expect(
+      link.startsWith(
+        "https://example.github.io/tzmeet/me/#n=Zahid&z=Asia%2FDhaka",
+      ),
+    ).toBe(true);
+    expect(parseMeHash(`#/me?${link.split("#")[1]}`)).toEqual(zahid);
+  });
+
+  it("reject links without a valid zone or with impossible hours, and default the rest", () => {
+    expect(parseMeHash("#/me")).toBeNull();
+    expect(parseMeHash("#/me?z=Mars/Base")).toBeNull();
+    expect(parseMeHash("#/me?z=UTC&w=09:00-09:00")).toBeNull();
+    expect(parseMeHash("#/me?z=Asia/Dhaka")).toEqual({
+      name: "",
+      zone: "Asia/Dhaka",
+      workStart: "09:00",
+      workEnd: "18:00",
+      weekend: [5, 6],
+    });
+    expect(parseMeHash("#/me?z=UTC&h=XX")!.holidayPreset).toBeUndefined();
+  });
+
+  it("lays out availability in the viewer's zone, following DST", () => {
+    const grid = availabilityGrid(
+      zahid,
+      "Europe/London",
+      new Date("2026-10-23T09:35:00Z"),
+    );
+    expect(grid.map((row) => row.date)).toEqual([
+      "2026-10-23",
+      "2026-10-24",
+      "2026-10-25",
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+    ]);
+    expect(grid[0]!.cells.every((cell) => cell === "off")).toBe(true);
+    expect(grid[2]!.cells.indexOf("work")).toBe(6);
+    expect(grid[2]!.cells.lastIndexOf("work")).toBe(23);
+    expect(grid[2]!.cells[5]).toBe("reachable");
+  });
+
+  it("says whether they are working now and when they next start", () => {
+    expect(statusNow(zahid, new Date("2026-10-26T05:00:00Z"))).toEqual({
+      kind: "work",
+      local: "Mon 11:00",
+    });
+    expect(statusNow(zahid, new Date("2026-10-23T09:35:00Z")).kind).toBe("off");
+    expect(nextWorkingTime(zahid, new Date("2026-10-23T09:35:00Z"))).toBe(
+      "2026-10-25T03:00:00.000Z",
+    );
+  });
+
+  it("lists upcoming public holidays", () => {
+    expect(upcomingHolidays(zahid, new Date("2026-12-01T00:00:00Z"))).toEqual([
+      { date: "2026-12-16", name: "Victory Day" },
+      { date: "2026-12-25", name: "Christmas Day" },
+    ]);
+    expect(
+      upcomingHolidays(
+        { ...zahid, holidayPreset: undefined },
+        new Date("2026-12-01T00:00:00Z"),
+      ),
+    ).toEqual([]);
   });
 });

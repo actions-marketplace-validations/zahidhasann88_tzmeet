@@ -75,7 +75,13 @@ export type {
 } from "./cron/parse.js";
 export { describeCron } from "./cron/describe.js";
 export { convertCronDialect, convertCronZone } from "./cron/convert.js";
-export type { CronDialectConversion, CronZoneConversion, CronZonePeriod } from "./cron/convert.js";
+export { looksLikeNaturalCron, parseNaturalCron } from "./cron/natural.js";
+export type { NaturalCron } from "./cron/natural.js";
+export type {
+  CronDialectConversion,
+  CronZoneConversion,
+  CronZonePeriod,
+} from "./cron/convert.js";
 export { recurringImpact, recurringSchema } from "./recurring.js";
 export {
   holidayListYears,
@@ -120,4 +126,5 @@ export {
   foldLine,
   calendarText,
   calendarCollectionText,
+  recurringCalendarText,
 } from "./invite-format.js";
