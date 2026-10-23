@@ -56,7 +56,7 @@ export function runCLI(
   const program = new Command();
   program
     .name("tzmeet")
-    .version("0.3.0")
+    .version("0.4.0")
     .description(
       "Find humane meeting slots across IANA time zones. No backend or calendar upload.",
     )
