@@ -1,5 +1,5 @@
 name: tzmeet cron check
-description: Fail pull requests on cron schedules that daylight saving skips or runs twice (crontab, Kubernetes, GitHub Actions, systemd, Jenkins, EventBridge).
+description: Fail pull requests on cron schedules that daylight saving skips or runs twice (crontab, Kubernetes, CI, cloud).
 author: zahidhasann88
 branding:
   icon: clock

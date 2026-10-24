@@ -228,6 +228,8 @@ describe("API CI contracts", () => {
 
 describe("GitHub Action (action.yml)", () => {
   const action = parseDocument(readFileSync("action.yml", "utf8")).toJS() as {
+    name: string;
+    description: string;
     inputs: Record<string, { default: string }>;
     runs: {
       using: string;
@@ -237,6 +239,11 @@ describe("GitHub Action (action.yml)", () => {
   const cli = JSON.parse(readFileSync("packages/cli/package.json", "utf8")) as {
     version: string;
   };
+
+  it("meets the Marketplace listing rules", () => {
+    expect(action.description.length).toBeLessThan(125);
+    expect(action.name.length).toBeGreaterThan(0);
+  });
 
   it("runs the published CLI version that matches this release", () => {
     expect(action.runs.using).toBe("composite");
