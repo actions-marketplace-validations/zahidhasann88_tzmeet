@@ -314,7 +314,7 @@ export default function MePage({
         )}
         <section
           id="me-view"
-          className="me-view"
+          className="me-view auto-scrollbar"
           aria-labelledby="me-view-heading"
           tabIndex={-1}
         >

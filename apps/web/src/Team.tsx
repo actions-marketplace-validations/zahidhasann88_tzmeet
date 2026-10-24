@@ -230,7 +230,7 @@ export default function TeamPage({
         )}
         <section
           id="team-view"
-          className="me-view"
+          className="me-view auto-scrollbar"
           aria-labelledby="team-view-heading"
           tabIndex={-1}
         >

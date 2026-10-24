@@ -2784,3 +2784,48 @@ input[aria-invalid="true"] {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Long pages, side by side: keep the controls (or the live preview) in view while the
+   other column scrolls. A sticky column taller than the screen scrolls on its own. */
+@media (min-width: 701px) {
+  .workspace > .settings {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+@media (min-width: 901px) {
+  .cron-layout > .cron-settings,
+  .me-layout:not(.is-shared) > .me-view {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  /* Room for focus rings and shadows inside the scrolling preview. */
+  .me-layout:not(.is-shared) > .me-view {
+    padding: 2px 4px 4px 2px;
+  }
+}
+/* Sticky columns: the scrollbar appears only while scrolling (see scrollbars.ts). */
+.auto-scrollbar {
+  scrollbar-color: transparent transparent;
+}
+.auto-scrollbar.is-scrolling {
+  scrollbar-color: var(--muted) transparent;
+}
+/* Browsers without scrollbar-color (older Safari). */
+.auto-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.auto-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+.auto-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background: var(--muted);
+}

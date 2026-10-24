@@ -19,6 +19,7 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 ### Changed
 
 - On phones, the site's tool menu (Meetings, Cron, My hours, Team) gets its own row under the logo.
+- On wide screens, the meeting finder's and cron page's settings stay in view while the results scroll (with their own scrollbar when taller than the screen, shown only while scrolling), and the My hours and Team builders keep the live preview in view while you edit.
 
 ## [0.4.0] - 2026-10-23
 

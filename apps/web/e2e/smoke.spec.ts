@@ -901,7 +901,6 @@ test("downloads or subscribes to a country's public holidays", async ({
     .analyze();
   expect(audit.violations).toEqual([]);
 
-  // The meeting finder offers the same links under each city's holiday setting.
   await page.goto("./");
   await page.getByRole("button", { name: "Settings" }).first().click();
   await page.getByLabel("Dhaka public holidays").selectOption("BD");
@@ -921,20 +920,72 @@ test("previews and copies a status badge for My hours", async ({ page }) => {
   await page.getByLabel("Your name").fill("Zahid");
   await page.getByLabel("Your time zone", { exact: true }).fill("Asia/Dhaka");
   const badge = page.locator(".me-badge");
-  await expect(badge.getByRole("img", { name: "Badge preview: Zahid's working hours" })).toBeVisible();
+  await expect(
+    badge.getByRole("img", { name: "Badge preview: Zahid's working hours" }),
+  ).toBeVisible();
   const preview = await badge.locator("img").getAttribute("src");
-  expect(decodeURIComponent(preview!)).toContain('aria-label="Zahid: working (Asia/Dhaka)"');
+  expect(decodeURIComponent(preview!)).toContain(
+    'aria-label="Zahid: working (Asia/Dhaka)"',
+  );
   await badge.getByRole("button", { name: "Copy Markdown" }).click();
-  const markdown = await page.evaluate(() => document.documentElement.dataset.clipboard!);
+  const markdown = await page.evaluate(
+    () => document.documentElement.dataset.clipboard!,
+  );
   expect(markdown).toMatch(
     /^\[!\[Zahid's working hours\]\(https:\/\/tzmeet-api\.onrender\.com\/v1\/badge\.svg\?n=Zahid&z=Asia%2FDhaka&w=09%3A00-18%3A00&d=56&h=BD\)\]\(http.+\/me\/#n=Zahid&z=Asia%2FDhaka/,
   );
   await badge.getByRole("button", { name: "Copy HTML" }).click();
-  expect(await page.evaluate(() => document.documentElement.dataset.clipboard!)).toMatch(/^<a href="http.+\/me\/#n=Zahid&amp;z=/);
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.clipboard!),
+  ).toMatch(/^<a href="http.+\/me\/#n=Zahid&amp;z=/);
   expect(requests.some((url) => url.includes("onrender.com"))).toBe(false);
   const audit = await new AxeBuilder({ page })
     .include(".me-badge")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
   expect(audit.violations).toEqual([]);
+});
+
+test("keeps controls and previews in view on long pages, on wide screens", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "Phones show one column");
+  await page.setViewportSize({ width: 1440, height: 800 });
+  const top = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((element) => Math.round(element.getBoundingClientRect().top));
+  await open(page);
+  await expect(page.locator(".slot-card").first()).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await expect.poll(() => top(".workspace > .settings")).toBe(16);
+  const settings = page.locator(".workspace > .settings");
+  await expect(settings).toHaveCSS("overflow-y", "auto");
+  await expect(settings).toHaveCSS(
+    "scrollbar-color",
+    "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)",
+  );
+  await settings.evaluate((element) => element.scrollBy(0, 40));
+  await expect(settings).toHaveClass(/is-scrolling/);
+  await expect(settings).not.toHaveCSS(
+    "scrollbar-color",
+    "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)",
+  );
+  await expect(settings).not.toHaveClass(/is-scrolling/, { timeout: 3000 });
+
+  const team = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      p: ["Asia/Dhaka", "Europe/London", "America/New_York", "Asia/Tokyo"].map(
+        (z) => ({ z }),
+      ),
+    }),
+  ).toString("base64url");
+  await page.goto(`./#/team?s=${team}`);
+  await page.getByRole("button", { name: "Edit a copy of this team" }).click();
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect(page.getByLabel("Name, person 3")).toBeInViewport();
+  await expect.poll(() => top(".me-view")).toBe(16);
+  await expect(page.locator(".team-grid")).toBeInViewport();
 });

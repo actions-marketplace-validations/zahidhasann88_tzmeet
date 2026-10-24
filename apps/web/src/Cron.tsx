@@ -204,7 +204,7 @@ export default function CronPage({
         </div>
       </section>
       <div className="cron-layout">
-        <aside className="settings cron-settings" aria-label="Cron settings">
+        <aside className="settings cron-settings auto-scrollbar" aria-label="Cron settings">
           <section className="settings-section">
             <div className="section-heading">
               <span className="step-number">01</span>

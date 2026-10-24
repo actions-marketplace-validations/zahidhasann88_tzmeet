@@ -56,6 +56,7 @@ import MePage from "./Me";
 import { ME_ROUTE, isMeRoute } from "./me-state";
 import TeamPage from "./Team";
 import { TEAM_ROUTE, isTeamRoute } from "./team-state";
+import { autoHideScrollbars } from "./scrollbars";
 
 type View = "meet" | "cron" | "me" | "team";
 const viewOf = (hash: string): View =>
@@ -107,6 +108,7 @@ export default function App() {
     [input, calendarResults],
   );
   const [view, setView] = useState<View>(() => viewOf(window.location.hash));
+  useEffect(() => autoHideScrollbars(), []);
   useEffect(() => {
     const route = () => setView(viewOf(window.location.hash));
     window.addEventListener("hashchange", route);
@@ -289,7 +291,7 @@ export default function App() {
               </div>
             </section>
             <div className="workspace">
-              <aside className="settings" aria-label="Meeting settings">
+              <aside className="settings auto-scrollbar" aria-label="Meeting settings">
                 <ZoneSettings
                   state={state}
                   setState={setState}
