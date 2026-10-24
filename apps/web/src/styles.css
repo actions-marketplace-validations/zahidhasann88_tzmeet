@@ -2634,3 +2634,102 @@ input[aria-invalid="true"] {
     white-space: nowrap;
   }
 }
+:root {
+  --team-all: #5f9a89;
+}
+:root[data-theme="dark"] {
+  --team-all: #9fd3c0;
+}
+.team-person {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px 12px;
+  margin: 0 0 14px;
+  display: grid;
+  gap: 2px;
+}
+.team-person legend {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+.team-person .text-button {
+  justify-self: start;
+}
+.team-add {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.team-add .full-field {
+  margin: 4px 0 0;
+}
+.team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.team-people {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.team-people li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.team-people span {
+  color: var(--muted);
+}
+.team-best {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 13px;
+}
+.team-best h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.team-best ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.team-best li span {
+  color: var(--muted);
+}
+.me-grid td.is-team-none {
+  background: var(--quiet);
+}
+@media (max-width: 520px) {
+  /* Four tools don't fit beside the logo: give the nav its own row. */
+  .site-header {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 12px 0;
+    row-gap: 12px;
+  }
+  .header-actions {
+    display: contents;
+  }
+  .brand {
+    margin-right: auto;
+  }
+  .view-nav {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  .view-nav a {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+}

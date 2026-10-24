@@ -67,7 +67,11 @@ See the [library guide](packages/core/README.md).
 
 Make a link with your working hours at **[zahidhasann88.github.io/tzmeet/#/me](https://zahidhasann88.github.io/tzmeet/#/me)** and put it in your email signature. Whoever opens it sees whether you're working now and your hours for the week, in their own time zone.
 
-### 6. Cron schedules
+### 6. Team hours link
+
+Add your team at **[zahidhasann88.github.io/tzmeet/#/team](https://zahidhasann88.github.io/tzmeet/#/team)** (or paste each person's "My hours" link) and share one link. Whoever opens it sees who's working now, when everyone's hours overlap this week, and a 7-day grid in their own time zone. "Find a meeting time" opens the meeting finder with the whole team filled in.
+
+### 7. Cron schedules
 
 tzmeet also explains cron schedules (Unix, Kubernetes, Spring, Quartz, AWS EventBridge, GitHub Actions, Jenkins, systemd timers, or plain English like "every weekday at 9am Dhaka"), converts them between syntaxes and time zones, and checks them for daylight saving problems: in the [web app](https://zahidhasann88.github.io/tzmeet/cron/), with `npx tzmeet cron`, or in CI with the GitHub Action, a [pre-commit hook or a GitLab CI template](packages/cli/README.md#check-schedules-in-ci):
 

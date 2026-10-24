@@ -53,10 +53,23 @@ import {
 import { CRON_ROUTE, isCronRoute } from "./cron-state";
 import MePage from "./Me";
 import { ME_ROUTE, isMeRoute } from "./me-state";
+import TeamPage from "./Team";
+import { TEAM_ROUTE, isTeamRoute } from "./team-state";
 
-type View = "meet" | "cron" | "me";
+type View = "meet" | "cron" | "me" | "team";
 const viewOf = (hash: string): View =>
-  isCronRoute(hash) ? "cron" : isMeRoute(hash) ? "me" : "meet";
+  isCronRoute(hash)
+    ? "cron"
+    : isMeRoute(hash)
+      ? "me"
+      : isTeamRoute(hash)
+        ? "team"
+        : "meet";
+const skipTargets = {
+  cron: ["cron-results", "Skip to cron results"],
+  me: ["me-view", "Skip to working hours"],
+  team: ["team-view", "Skip to team hours"],
+} as const;
 
 type StateSetter = Dispatch<SetStateAction<WebState | null>>;
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -154,15 +167,13 @@ export default function App() {
       {view !== "meet" ? (
         <a
           className="skip-link"
-          href={view === "cron" ? "#cron-results" : "#me-view"}
+          href={`#${skipTargets[view][0]}`}
           onClick={(event) => {
             event.preventDefault();
-            document
-              .getElementById(view === "cron" ? "cron-results" : "me-view")
-              ?.focus();
+            document.getElementById(skipTargets[view][0])?.focus();
           }}
         >
-          {view === "cron" ? "Skip to cron results" : "Skip to working hours"}
+          {skipTargets[view][1]}
         </a>
       ) : (
         <a className="skip-link" href="#results">
@@ -195,6 +206,12 @@ export default function App() {
               aria-current={view === "me" ? "page" : undefined}
             >
               My hours
+            </a>
+            <a
+              href={TEAM_ROUTE}
+              aria-current={view === "team" ? "page" : undefined}
+            >
+              Team
             </a>
           </nav>
           <span className="privacy-note">
@@ -241,6 +258,8 @@ export default function App() {
           <CronPage copy={copy} />
         ) : view === "me" ? (
           <MePage copy={copy} />
+        ) : view === "team" ? (
+          <TeamPage copy={copy} />
         ) : (
           <>
             <section className="intro" aria-labelledby="page-title">
@@ -1276,7 +1295,6 @@ function WorkspaceResults({
   copy,
   notify,
 }: {
-
   input: NormalizedInput;
   state: WebState;
   setState: StateSetter;

@@ -12,6 +12,11 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 - pre-commit hook `tzmeet-cron-check` (`.pre-commit-hooks.yaml`) that checks the schedule files in each commit.
 - GitLab CI template (`templates/tzmeet-cron-check.gitlab-ci.yml`) that fails the pipeline on DST problems and shows them in merge requests.
 - Native time-zone snippets for the new engines in `convertCronZone` (`ScheduleExpressionTimezone`, `timezone:`, `TZ=`, `OnCalendar=… zone`).
+- Team hours page (`#/team`, shared through a `/team/` page with its own link preview): one link with up to 12 people, each with their own zone, work hours, weekend and public holidays. Shows who's working now, the longest stretches this week when everyone (or the most people) works, and a 7-day grid shaded by how many people are working, in the viewer's time zone. People can be added from their My hours links. "Find a meeting time" opens the meeting finder with the team; people in the same zone become one city with the hours they share.
+
+### Changed
+
+- On phones, the site's tool menu (Meetings, Cron, My hours, Team) gets its own row under the logo.
 
 ## [0.4.0] - 2026-10-23
 

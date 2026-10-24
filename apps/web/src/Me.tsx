@@ -29,13 +29,137 @@ const kindLabels = {
   reachable: "Can be reached",
   off: "Off",
 } as const;
-const browserZone = () => {
+export const browserZone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   } catch {
     return "UTC";
   }
 };
+
+export interface PersonLabels {
+  /** Visible text of the name field. */
+  nameText: string;
+  name: string;
+  zone: string;
+  start: string;
+  end: string;
+  weekend: (day: string) => string;
+  holidays: string;
+}
+
+const meLabels: PersonLabels = {
+  nameText: "Name",
+  name: "Your name",
+  zone: "Your time zone",
+  start: "Work starts",
+  end: "Work ends",
+  weekend: (day) => `${day} weekend`,
+  holidays: "Public holidays",
+};
+
+/** Name, zone, work hours, weekend and holidays for one person. */
+export function PersonFields({
+  person,
+  zones,
+  onChange,
+  labels,
+}: {
+  person: MeState;
+  zones: string[];
+  onChange: (changes: Partial<MeState>) => void;
+  labels: PersonLabels;
+}) {
+  return (
+    <>
+      <label className="full-field">
+        {labels.nameText}
+        <input
+          aria-label={labels.name}
+          maxLength={40}
+          placeholder="Optional"
+          value={person.name}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
+      </label>
+      <ZoneInput
+        label={labels.zone}
+        zones={zones}
+        value={person.zone}
+        onPick={(zone) =>
+          onChange({
+            zone,
+            weekend: defaultWeekend(zone),
+            holidayPreset: suggestHolidayPreset(zone),
+          })
+        }
+      />
+      <div className="field-pair">
+        <label>
+          Work starts
+          <input
+            type="time"
+            aria-label={labels.start}
+            value={person.workStart}
+            onChange={(event) => onChange({ workStart: event.target.value })}
+          />
+        </label>
+        <label>
+          Work ends
+          <input
+            type="time"
+            aria-label={labels.end}
+            value={person.workEnd}
+            onChange={(event) => onChange({ workEnd: event.target.value })}
+          />
+        </label>
+      </div>
+      <fieldset className="weekday-field">
+        <legend>Weekend days</legend>
+        <div className="weekday-options">
+          {dayNames.map((day, index) => (
+            <label key={day}>
+              <input
+                type="checkbox"
+                aria-label={labels.weekend(day)}
+                checked={person.weekend.includes(index + 1)}
+                onChange={(event) =>
+                  onChange({
+                    weekend: event.target.checked
+                      ? [...person.weekend, index + 1].sort()
+                      : person.weekend.filter((value) => value !== index + 1),
+                  })
+                }
+              />
+              <span>{day}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="full-field">
+        Public holidays
+        <select
+          aria-label={labels.holidays}
+          value={person.holidayPreset ?? ""}
+          onChange={(event) =>
+            onChange({
+              holidayPreset: (event.target.value || undefined) as
+                | HolidayPreset
+                | undefined,
+            })
+          }
+        >
+          <option value="">None</option>
+          {holidayPresetIds.map((id) => (
+            <option key={id} value={id}>
+              {holidayPresets[id]}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
+  );
+}
 
 export default function MePage({
   copy,
@@ -104,97 +228,12 @@ export default function MePage({
                 <span className="step-number">01</span>
                 <h2>Your hours</h2>
               </div>
-              <label className="full-field">
-                Name
-                <input
-                  aria-label="Your name"
-                  maxLength={40}
-                  placeholder="Optional"
-                  value={draft.name}
-                  onChange={(event) => update({ name: event.target.value })}
-                />
-              </label>
-              <ZoneInput
-                label="Your time zone"
+              <PersonFields
+                person={draft}
                 zones={zones}
-                value={draft.zone}
-                onPick={(zone) =>
-                  update({
-                    zone,
-                    weekend: defaultWeekend(zone),
-                    holidayPreset: suggestHolidayPreset(zone),
-                  })
-                }
+                onChange={update}
+                labels={meLabels}
               />
-              <div className="field-pair">
-                <label>
-                  Work starts
-                  <input
-                    type="time"
-                    aria-label="Work starts"
-                    value={draft.workStart}
-                    onChange={(event) =>
-                      update({ workStart: event.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Work ends
-                  <input
-                    type="time"
-                    aria-label="Work ends"
-                    value={draft.workEnd}
-                    onChange={(event) =>
-                      update({ workEnd: event.target.value })
-                    }
-                  />
-                </label>
-              </div>
-              <fieldset className="weekday-field">
-                <legend>Weekend days</legend>
-                <div className="weekday-options">
-                  {dayNames.map((day, index) => (
-                    <label key={day}>
-                      <input
-                        type="checkbox"
-                        aria-label={`${day} weekend`}
-                        checked={draft.weekend.includes(index + 1)}
-                        onChange={(event) =>
-                          update({
-                            weekend: event.target.checked
-                              ? [...draft.weekend, index + 1].sort()
-                              : draft.weekend.filter(
-                                  (value) => value !== index + 1,
-                                ),
-                          })
-                        }
-                      />
-                      <span>{day}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <label className="full-field">
-                Public holidays
-                <select
-                  aria-label="Public holidays"
-                  value={draft.holidayPreset ?? ""}
-                  onChange={(event) =>
-                    update({
-                      holidayPreset: (event.target.value || undefined) as
-                        | HolidayPreset
-                        | undefined,
-                    })
-                  }
-                >
-                  <option value="">None</option>
-                  {holidayPresetIds.map((id) => (
-                    <option key={id} value={id}>
-                      {holidayPresets[id]}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <button
                 type="button"
                 className="button button-primary me-copy"

@@ -97,7 +97,7 @@ const prayerDefault = {
   bufferMinutes: 10,
 };
 
-function toBase64Url(text: string): string {
+export function toBase64Url(text: string): string {
   let binary = "";
   for (const byte of new TextEncoder().encode(text))
     binary += String.fromCharCode(byte);
@@ -106,7 +106,7 @@ function toBase64Url(text: string): string {
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 }
-function fromBase64Url(value: string): string {
+export function fromBase64Url(value: string): string {
   const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
   return new TextDecoder().decode(
     Uint8Array.from(binary, (character) => character.charCodeAt(0)),

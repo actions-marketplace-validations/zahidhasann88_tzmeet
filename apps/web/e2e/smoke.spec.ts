@@ -744,3 +744,108 @@ test("downloads a meeting as a weekly calendar series", async ({ page }) => {
   expect(text).toContain("DTSTART;TZID=Asia/Dhaka:");
   expect(text).toContain("BEGIN:VTIMEZONE");
 });
+
+test.describe("team hours page", () => {
+  test.use({ timezoneId: "Europe/London" });
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  const platform = {
+    v: 1,
+    t: "Platform",
+    p: [
+      { n: "Zahid", z: "Asia/Dhaka", h: "BD" },
+      { n: "Ana", z: "Europe/London", w: "09:00-17:30" },
+      { n: "Ben", z: "America/New_York", w: "09:00-17:00" },
+    ],
+  };
+
+  test("shows who's working and when hours overlap, in the viewer's time zone", async ({
+    page,
+  }) => {
+    // Monday 26 October 2026, 10:15 in London.
+    await page.clock.setFixedTime(new Date("2026-10-26T10:15:00Z"));
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(`./team/#s=${encode(platform)}`);
+    await expect(
+      page.getByRole("heading", { name: "When Platform is available." }),
+    ).toBeVisible();
+    const status = page.locator(".me-status");
+    await expect(status).toContainText("2 of 3 working now");
+    await expect(status).toContainText("Mon 16:15 in Dhaka · Working");
+    await expect(status).toContainText("Mon 06:15 in New York · Off");
+    const best = page.locator(".team-best");
+    await expect(best).toContainText(
+      "No time when everyone works this week. Most overlap: 2 of 3",
+    );
+    await expect(best).toContainText("Mon 26 Oct, 13:00–17:30 4 h 30 min · Ana, Ben");
+    await expect(page.locator(".team-grid tbody tr")).toHaveCount(7);
+    await expect(
+      page.locator(".team-grid tbody tr").first().locator("td").nth(20),
+    ).toHaveAttribute("title", "Mon 26 Oct 10:00: 2 of 3 working (Zahid, Ana)");
+    await expect(page.getByLabel("Name, person 1")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const audit = await new AxeBuilder({ page })
+      .include("main")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(audit.violations).toEqual([]);
+
+    await page.getByRole("link", { name: "Find a meeting time" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Find common ground." }),
+    ).toBeVisible();
+    const state = decodeState(new URL(page.url()).search)!;
+    expect(state.input.zones.map((zone) => zone.label)).toEqual([
+      "Zahid",
+      "Ana",
+      "Ben",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  test("builds a team from scratch and from My hours links, and copies a link", async ({
+    page,
+    context,
+  }) => {
+    await mockClipboard(page);
+    await page.goto("./#/team");
+    await expect(
+      page.getByRole("heading", { name: "Share your team's hours." }),
+    ).toBeVisible();
+    await page.getByLabel("Team name").fill("Platform");
+    await page.getByLabel("Name, person 1").fill("Zahid");
+    await page.getByLabel("Time zone, person 1").fill("Asia/Dhaka");
+    await expect(page.getByLabel("Fri weekend, person 1")).toBeChecked();
+    await page.getByLabel("Name, person 2").fill("Ana");
+    await page.getByLabel("My hours link").fill("https://example.com/tzmeet/me/#n=Ben&z=America%2FNew_York&w=09:00-17:00&d=67");
+    await page.getByRole("button", { name: "Add from link" }).click();
+    await expect(page.getByLabel("Name, person 3")).toHaveValue("Ben");
+    await expect(page.getByLabel("Work ends, person 3")).toHaveValue("17:00");
+    await page.getByLabel("My hours link").fill("https://example.com/");
+    await page.getByRole("button", { name: "Add from link" }).click();
+    await expect(page.getByRole("alert")).toHaveText("That isn't a My hours link.");
+    await page.getByRole("button", { name: "Copy team link" }).click();
+    const link = await page.evaluate(
+      () => document.documentElement.dataset.clipboard!,
+    );
+    expect(new URL(link).pathname.endsWith("/team/")).toBe(true);
+    const opened = await context.newPage();
+    await opened.goto(link);
+    await expect(
+      opened.getByRole("heading", { name: "When Platform is available." }),
+    ).toBeVisible();
+    await expect(opened.locator(".team-people li")).toHaveCount(3);
+    await opened.getByRole("button", { name: "Edit a copy of this team" }).click();
+    await expect(opened.getByLabel("Name, person 3")).toHaveValue("Ben");
+  });
+
+  test("has its own link preview", async ({ page }) => {
+    const teamPage = await (await page.request.get("./team/")).text();
+    expect(teamPage).toContain("og/tzmeet-team.png");
+  });
+});
