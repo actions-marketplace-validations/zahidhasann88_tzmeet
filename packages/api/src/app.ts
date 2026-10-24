@@ -21,6 +21,9 @@ import {
   recurringImpact,
   recurringCalendarText,
   holidayCalendarText,
+  availabilityNow,
+  badgeSvg,
+  zoneSchema,
   holidayPresets,
   presetHolidays,
   presetNote,
@@ -54,6 +57,7 @@ import {
   recurringQuerySchema,
   recurringResultSchema,
   healthSchema,
+  badgeQuerySchema,
   holidaysIcsQuerySchema,
   holidaysQuerySchema,
   holidaysResultSchema,
@@ -320,6 +324,28 @@ const getHolidaysCalendar = createRoute({
     ...errorResponses,
   },
 });
+const getBadge = createRoute({
+  method: "get",
+  path: "/v1/badge.svg",
+  tags: ["Availability"],
+  summary:
+    "A small badge saying whether someone is working now (working, off, weekend or holiday), for a README or profile",
+  request: { query: badgeQuerySchema },
+  responses: {
+    200: {
+      description:
+        "SVG badge, cached for 5 minutes. Wrap it in a link to the person's My hours page",
+      content: {
+        "image/svg+xml": {
+          schema: z.string(),
+          example:
+            '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="20">…</svg>',
+        },
+      },
+    },
+    ...errorResponses,
+  },
+});
 const getHealth = createRoute({
   method: "get",
   path: "/v1/health",
@@ -340,6 +366,7 @@ const methods: Record<string, readonly string[]> = {
   "/v1/recurring": ["GET", "HEAD"],
   "/v1/holidays": ["GET", "HEAD"],
   "/v1/holidays.ics": ["GET", "HEAD"],
+  "/v1/badge.svg": ["GET", "HEAD"],
   "/v1/health": ["GET", "HEAD"],
   "/openapi.json": ["GET", "HEAD"],
   "/docs": ["GET", "HEAD"],
@@ -673,6 +700,74 @@ export function createApp(options: AppOptions = {}) {
     return c.text(body, 200, {
       "Content-Type": "text/calendar; charset=utf-8",
     });
+  });
+  app.openapi(getBadge, (c) => {
+    const query = c.req.valid("query");
+    const [workStart, workEnd] = (query.w ?? "09:00-18:00").split("-") as [
+      string,
+      string,
+    ];
+    const shift = (time: string, minutes: number) => {
+      const [hours, mins] = time.split(":").map(Number) as [number, number];
+      const total = (((hours * 60 + mins + minutes) % 1440) + 1440) % 1440;
+      return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    };
+    const rule = {
+      id: query.z,
+      workStart,
+      workEnd,
+      quietBefore: shift(workStart, -60),
+      quietAfter: shift(workEnd, 60),
+      ...(query.d !== undefined
+        ? { weekend: [...new Set([...query.d].map(Number))].sort() }
+        : {}),
+      ...(query.h ? { holidayPreset: query.h } : {}),
+    };
+    const checked = zoneSchema.safeParse(rule);
+    if (!checked.success) {
+      const parameter: Record<string, string> = {
+        id: "z",
+        workStart: "w",
+        workEnd: "w",
+        quietBefore: "w",
+        quietAfter: "w",
+        weekend: "d",
+        holidayPreset: "h",
+      };
+      throw validationError(
+        new z.ZodError(
+          checked.error.issues.map((issue) => ({
+            ...issue,
+            path: [parameter[String(issue.path[0])] ?? "z"],
+          })),
+        ),
+        query,
+      );
+    }
+    const status = availabilityNow(rule, now());
+    if (!options.apiKeys?.length)
+      c.header(
+        "Cache-Control",
+        "public, max-age=300, s-maxage=300, stale-while-revalidate=600, stale-if-error=86400",
+      );
+    c.header(
+      "Content-Security-Policy",
+      "default-src 'none'; style-src 'unsafe-inline'",
+    );
+    return c.body(
+      badgeSvg({
+        label:
+          query.n ||
+          (query.z === "UTC"
+            ? "UTC"
+            : query.z.split("/").at(-1)!.replaceAll("_", " ")),
+        status: status.status,
+        ...(status.holiday ? { holiday: status.holiday } : {}),
+        zone: query.z,
+      }),
+      200,
+      { "Content-Type": "image/svg+xml; charset=utf-8" },
+    );
   });
   app.openapi(getHealth, (c) => {
     c.header("Cache-Control", "public, max-age=30");

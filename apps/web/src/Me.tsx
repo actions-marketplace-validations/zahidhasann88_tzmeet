@@ -14,6 +14,8 @@ import { ZoneInput } from "./Cron";
 import { friendlyName } from "./state";
 import {
   availabilityGrid,
+  badgePreview,
+  badgeSnippets,
   defaultMeState,
   meHash,
   meShareLink,
@@ -255,6 +257,59 @@ export default function MePage({
                 Copy your link
               </button>
             </section>
+            {valid && (
+              <section
+                className="settings-section me-badge"
+                aria-labelledby="me-badge-title"
+              >
+                <div className="section-heading">
+                  <span className="step-number">02</span>
+                  <h2 id="me-badge-title">Status badge</h2>
+                </div>
+                <p className="detail-hint">
+                  For a README, website or email signature. It shows whether
+                  you're working now and links to your hours.
+                </p>
+                <img
+                  className="me-badge-preview"
+                  src={badgePreview(draft, now)}
+                  alt={`Badge preview: ${badgeSnippets(draft, window.location.href).alt}`}
+                  height={20}
+                />
+                <div className="me-badge-actions">
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={() =>
+                      void copy(
+                        badgeSnippets(draft, window.location.href).markdown,
+                        "Badge Markdown copied.",
+                      )
+                    }
+                  >
+                    <Icon name="copy" />
+                    Copy Markdown
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-outline"
+                    onClick={() =>
+                      void copy(
+                        badgeSnippets(draft, window.location.href).html,
+                        "Badge HTML copied.",
+                      )
+                    }
+                  >
+                    <Icon name="copy" />
+                    Copy HTML
+                  </button>
+                </div>
+                <p className="detail-hint">
+                  The badge updates every few minutes. It loads from the tzmeet
+                  API, which only sees the hours in the badge's link.
+                </p>
+              </section>
+            )}
           </aside>
         )}
         <section

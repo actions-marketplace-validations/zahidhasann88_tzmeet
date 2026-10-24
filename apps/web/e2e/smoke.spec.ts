@@ -911,3 +911,30 @@ test("downloads or subscribes to a country's public holidays", async ({
     }),
   ).toBeVisible();
 });
+
+test("previews and copies a status badge for My hours", async ({ page }) => {
+  await mockClipboard(page);
+  await page.clock.setFixedTime(new Date("2026-10-14T05:00:00Z"));
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("./#/me");
+  await page.getByLabel("Your name").fill("Zahid");
+  await page.getByLabel("Your time zone", { exact: true }).fill("Asia/Dhaka");
+  const badge = page.locator(".me-badge");
+  await expect(badge.getByRole("img", { name: "Badge preview: Zahid's working hours" })).toBeVisible();
+  const preview = await badge.locator("img").getAttribute("src");
+  expect(decodeURIComponent(preview!)).toContain('aria-label="Zahid: working (Asia/Dhaka)"');
+  await badge.getByRole("button", { name: "Copy Markdown" }).click();
+  const markdown = await page.evaluate(() => document.documentElement.dataset.clipboard!);
+  expect(markdown).toMatch(
+    /^\[!\[Zahid's working hours\]\(https:\/\/tzmeet-api\.onrender\.com\/v1\/badge\.svg\?n=Zahid&z=Asia%2FDhaka&w=09%3A00-18%3A00&d=56&h=BD\)\]\(http.+\/me\/#n=Zahid&z=Asia%2FDhaka/,
+  );
+  await badge.getByRole("button", { name: "Copy HTML" }).click();
+  expect(await page.evaluate(() => document.documentElement.dataset.clipboard!)).toMatch(/^<a href="http.+\/me\/#n=Zahid&amp;z=/);
+  expect(requests.some((url) => url.includes("onrender.com"))).toBe(false);
+  const audit = await new AxeBuilder({ page })
+    .include(".me-badge")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+});

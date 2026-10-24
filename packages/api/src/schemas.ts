@@ -303,6 +303,46 @@ export const holidaysQuerySchema = z
       }),
   })
   .strict();
+export const badgeQuerySchema = z
+  .object({
+    z: z.string().openapi({
+      example: "Asia/Dhaka",
+      description: "IANA time zone (the same parameters as a My hours link)",
+    }),
+    w: z
+      .string()
+      .regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "w must look like 09:00-18:00")
+      .optional()
+      .openapi({
+        example: "09:00-18:00",
+        description: "Work hours. Default: 09:00-18:00",
+      }),
+    d: z
+      .string()
+      .regex(
+        /^[1-7]{0,7}$/,
+        "d must list weekend days as digits 1-7 (1 = Monday)",
+      )
+      .optional()
+      .openapi({
+        example: "56",
+        description:
+          "Weekend days, 1 = Monday. Default: the zone's usual weekend",
+      }),
+    h: z
+      .enum(holidayPresetIds)
+      .optional()
+      .openapi({ example: "BD", description: "Holiday preset" }),
+    n: z
+      .string()
+      .max(40, "n must be at most 40 characters")
+      .optional()
+      .openapi({
+        example: "Zahid",
+        description: "Name on the badge. Default: the city",
+      }),
+  })
+  .strict();
 export const holidaysIcsQuerySchema = z
   .object({ preset: presetQuery })
   .strict();

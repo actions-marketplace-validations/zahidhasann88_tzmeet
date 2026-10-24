@@ -1,5 +1,7 @@
 import { DateTime } from "luxon";
 import {
+  availabilityNow,
+  badgeSvg,
   classifySpans,
   defaultWeekend,
   holidayPresetIds,
@@ -9,6 +11,8 @@ import {
   type HolidayPreset,
   type ZoneRule,
 } from "@tzmeet/core";
+import { API_URL } from "./api-url";
+import { friendlyName } from "./state";
 
 export interface MeState {
   name: string;
@@ -167,4 +171,41 @@ export function upcomingHolidays(
   ]
     .filter((holiday) => holiday.date >= today && holiday.date <= until)
     .map(({ date, name }) => ({ date, name }));
+}
+
+export function badgeUrl(state: MeState): string {
+  return `${API_URL}/v1/badge.svg?${meHash(state).split("?")[1]}`;
+}
+
+const escapeAttribute = (text: string) =>
+  text
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+export function badgeSnippets(
+  state: MeState,
+  href: string,
+): { markdown: string; html: string; alt: string } {
+  const owner = state.name || friendlyName(state.zone);
+  const alt = `${owner}'s working hours`;
+  const image = badgeUrl(state);
+  const link = meShareLink(state, href);
+  return {
+    alt,
+    markdown: `[![${alt.replace(/[[\]]/g, "")}](${image})](${link})`,
+    html: `<a href="${escapeAttribute(link)}"><img src="${escapeAttribute(image)}" alt="${escapeAttribute(alt)}" height="20"></a>`,
+  };
+}
+
+export function badgePreview(state: MeState, now: Date): string {
+  const status = availabilityNow(meZoneRule(state), now);
+  const svg = badgeSvg({
+    label: state.name || friendlyName(state.zone),
+    status: status.status,
+    ...(status.holiday ? { holiday: status.holiday } : {}),
+    zone: state.zone,
+  });
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

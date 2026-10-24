@@ -1,7 +1,6 @@
 import { holidayCalendarText, type HolidayPreset } from "@tzmeet/core";
+import { API_URL } from "./api-url";
 import { downloadIcs } from "./invite";
-
-export const API_URL = "https://tzmeet-api.onrender.com";
 
 export function holidayFeedUrl(preset: HolidayPreset): string {
   return `${API_URL}/v1/holidays.ics?preset=${encodeURIComponent(preset)}`;

@@ -28,6 +28,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |
 | `GET /v1/holidays?preset=BD&year=2027` | A country's public holidays for one year (approximate dates marked) |
 | `GET /v1/holidays.ics?preset=BD` | The same as a calendar feed for this year and next: subscribe in Google, Apple or Outlook calendar |
+| `GET /v1/badge.svg?n=Zahid&z=Asia/Dhaka&w=09:00-18:00&d=56&h=BD` | A small badge saying whether someone is working now (working, off, weekend or holiday), with the same parameters as a My hours link. Cached for 5 minutes |
 | `GET /v1/health` | Health check |
 | `GET /docs` | Interactive docs |
 

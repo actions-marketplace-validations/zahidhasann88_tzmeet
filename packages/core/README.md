@@ -43,6 +43,8 @@ if (result.slots.length === 0) {
 - `recurringImpact({ zones, startDate, time, weeks?, durationMinutes? })` – follows a weekly meeting (fixed at `time` in the first zone) through the coming weeks and shows where each zone's local time moves because of daylight saving, and why.
 - `fairRotation(result, { size: 2 | 3 })` – picks times from a search to alternate week by week, so the inconvenient slot is shared instead of always falling on the same city.
 - `holidayCalendarText(preset, { years, created })` – a holiday preset as an `.ics` calendar of all-day events, with stable IDs so subscribed calendars update instead of duplicating.
+- `availabilityNow(zone, at)` – whether someone is working at an instant, or off, on their weekend or on a holiday (with its name).
+- `badgeSvg({ label, status, holiday?, zone })` – a small shields-style status badge as SVG text.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 

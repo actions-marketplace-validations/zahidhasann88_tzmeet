@@ -1156,3 +1156,58 @@ describe("holiday calendars", () => {
     ).toBe(200);
   });
 });
+
+describe("availability badge", () => {
+  const badge = (query: string) => app.request(`/v1/badge.svg?${query}`);
+
+  it("returns an SVG badge with short caching and a strict content policy", async () => {
+    const response = await badge(
+      "n=Zahid&z=Asia%2FDhaka&w=09:00-18:00&d=56&h=BD",
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe(
+      "image/svg+xml; charset=utf-8",
+    );
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, max-age=300, s-maxage=300, stale-while-revalidate=600, stale-if-error=86400",
+    );
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'unsafe-inline'",
+    );
+    const svg = await response.text();
+    expect(svg).toContain('aria-label="Zahid: off (Asia/Dhaka)"');
+  });
+
+  it("says working, weekend, and uses the city when there's no name", async () => {
+    expect(
+      await (await badge("n=Zahid&z=Asia%2FDhaka&w=09:00-19:00")).text(),
+    ).toContain('aria-label="Zahid: working (Asia/Dhaka)"');
+    expect(await (await badge("z=Asia%2FDhaka&d=3")).text()).toContain(
+      'aria-label="Dhaka: weekend (Asia/Dhaka)"',
+    );
+    expect(
+      await (await badge("z=America%2FNew_York&w=08:00-17:00")).text(),
+    ).toContain('aria-label="New York: working (America/New_York)"');
+  });
+
+  it("escapes names and rejects bad parameters", async () => {
+    const svg = await (
+      await badge(`z=UTC&n=${encodeURIComponent("<b>x</b>")}`)
+    ).text();
+    expect(svg).not.toContain("<b>");
+    expect(svg).toContain("&lt;b&gt;x&lt;/b&gt;");
+    for (const [query, field] of [
+      ["z=Mars%2FBase", "z"],
+      ["z=UTC&w=9-5", "w"],
+      ["z=UTC&w=09:00-09:00", "w"],
+      ["z=UTC&d=8", "d"],
+      ["z=UTC&h=XX", "h"],
+      [`z=UTC&n=${"a".repeat(41)}`, "n"],
+    ] as const) {
+      const error = await publicError(await badge(query));
+      expect(error.details?.map((detail) => detail.field).join(",")).toContain(
+        field,
+      );
+    }
+  });
+});

@@ -65,7 +65,7 @@ See the [library guide](packages/core/README.md).
 
 ### 5. "My hours" link
 
-Make a link with your working hours at **[zahidhasann88.github.io/tzmeet/#/me](https://zahidhasann88.github.io/tzmeet/#/me)** and put it in your email signature. Whoever opens it sees whether you're working now and your hours for the week, in their own time zone.
+Make a link with your working hours at **[zahidhasann88.github.io/tzmeet/#/me](https://zahidhasann88.github.io/tzmeet/#/me)** and put it in your email signature. Whoever opens it sees whether you're working now and your hours for the week, in their own time zone. You can also copy a small status badge (working, off, weekend or holiday) for a README or website, linked to your hours.
 
 ### 6. Team hours link
 

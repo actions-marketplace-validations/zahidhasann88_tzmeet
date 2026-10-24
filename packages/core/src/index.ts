@@ -129,3 +129,5 @@ export {
   recurringCalendarText,
   holidayCalendarText,
 } from "./invite-format.js";
+export { availabilityNow, badgeMessage, badgeSvg } from "./badge.js";
+export type { AvailabilityNow, BadgeStatus } from "./badge.js";
