@@ -222,11 +222,11 @@ No slots found is a successful search (exit 0); invalid input exits 1.
   program
     .command("cron <expression...>")
     .description(
-      "Explain, convert or check cron schedules (Unix, Kubernetes, Spring, Quartz): next runs, DST warnings",
+      "Explain, convert or check cron schedules (Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins, systemd): next runs, DST warnings",
     )
     .option(
       "--dialect <name>",
-      "unix, kubernetes, spring or quartz (default: detected from the expression)",
+      "unix, kubernetes, spring, quartz, eventbridge, github, jenkins or systemd (default: detected from the expression)",
     )
     .option("--zone <id>", "zone the schedule runs in (default: UTC)")
     .option(
@@ -237,7 +237,7 @@ No slots found is a successful search (exit 0); invalid input exits 1.
     .option("--from <iso>", "list runs after this instant (default: now)")
     .option(
       "--to <dialect>",
-      "convert to unix, kubernetes, spring or quartz syntax",
+      "convert to unix, kubernetes, spring, quartz, eventbridge, github, jenkins or systemd syntax",
     )
     .option(
       "--to-zone <id>",
@@ -245,7 +245,7 @@ No slots found is a successful search (exit 0); invalid input exits 1.
     )
     .option(
       "--check",
-      "treat the arguments as files/folders: check crontabs and Kubernetes CronJob YAML for DST problems",
+      "treat the arguments as files/folders: check crontabs, Kubernetes CronJobs, GitHub workflows, systemd timers, Jenkinsfiles and EventBridge schedules for DST problems",
     )
     .option("--strict", "with --check: also fail on warnings")
     .option("--format <format>", "with --check: text or github (annotations)")
@@ -256,6 +256,8 @@ Quote the expression so the shell doesn't expand *:
   tzmeet cron "30 2 * * *" --zone America/New_York
   tzmeet cron "0 0 9 ? * MON-FRI" --dialect quartz --zone Asia/Dhaka
   tzmeet cron "0 1 * * *" --dialect kubernetes --zone Europe/London --json
+  tzmeet cron "cron(0 9 ? * MON-FRI *)" --zone Europe/Berlin
+  tzmeet cron "Mon..Fri *-*-* 09:00:00 Asia/Dhaka"
 
 Convert:
   tzmeet cron "0 9 * * 1-5" --to quartz
@@ -300,6 +302,7 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
             cwd: context.cwd ?? process.cwd(),
             zone: options.zone ?? "UTC",
             from,
+            ...(options.zone ? { localZone: options.zone } : {}),
           });
           writeOut(
             json

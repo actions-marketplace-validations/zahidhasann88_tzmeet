@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { conversionSchema, cronDialects, findSlotsSchema } from "@tzmeet/core";
+import { conversionSchema, cronDialects, findSlotsSchema, type CronDialect } from "@tzmeet/core";
 
 export const API_LIMITS = {
   zones: 8,
@@ -303,7 +303,7 @@ export const cronQuerySchema = z
           "Cron expression; detected as Unix, Kubernetes, Spring or Quartz unless dialect is set",
       }),
     dialect: z
-      .enum(cronDialects as ["unix", "kubernetes", "spring", "quartz"])
+      .enum(cronDialects as [CronDialect, ...CronDialect[]])
       .optional()
       .openapi({ example: "unix" }),
     zone: z.string().optional().openapi({
@@ -336,7 +336,7 @@ const cronZoneSchema = z.object({
 });
 export const cronResultSchema = z
   .object({
-    dialect: z.enum(cronDialects as ["unix", "kubernetes", "spring", "quartz"]),
+    dialect: z.enum(cronDialects as [CronDialect, ...CronDialect[]]),
     dialectName: z.string(),
     expression: z.string(),
     zone: z.string(),
@@ -348,7 +348,7 @@ export const cronResultSchema = z
         local: z.string(),
         scheduled: z.string(),
         note: z
-          .enum(["gap-catch-up", "fold-once", "fold-first", "fold-second"])
+          .enum(["gap-catch-up", "fold-once", "fold-first", "fold-second", "fold-maybe-twice"])
           .optional(),
         zones: z.array(cronZoneSchema),
       }),
@@ -448,7 +448,7 @@ export const recurringResultSchema = z
   .openapi("RecurringImpact");
 
 const dialectEnum = z.enum(
-  cronDialects as ["unix", "kubernetes", "spring", "quartz"],
+  cronDialects as [CronDialect, ...CronDialect[]],
 );
 export const cronConvertQuerySchema = z
   .object({

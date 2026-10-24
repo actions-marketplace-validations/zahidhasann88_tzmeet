@@ -62,7 +62,9 @@ export function cronHash(state: CronState): string {
   return `${CRON_ROUTE}?${params}`;
 }
 
-export function fieldLabels(tokens: number): string[] {
+export function fieldLabels(tokens: number, dialect?: string): string[] {
+  if (dialect === "eventbridge")
+    return ["minute", "hour", "day of month", "month", "day of week", "year"];
   if (tokens === 5)
     return ["minute", "hour", "day of month", "month", "day of week"];
   return [

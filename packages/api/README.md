@@ -22,7 +22,7 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `POST /v1/slots` | Same, with a JSON body for per-city settings |
 | `GET /v1/zones?search=dhaka` | Search time zone names |
 | `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a time |
-| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring or Quartz): next runs and DST warnings |
+| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins or systemd): next runs and DST warnings |
 | `GET /v1/cron/convert?expression=0 9 * * 1-5&to=quartz&zone=Asia/Dhaka&toZone=UTC` | Convert a cron expression to another syntax and/or a server's time zone |
 | `GET /v1/cron/natural?text=every weekday at 9am Dhaka&dialect=kubernetes` | Turn plain English into a cron expression |
 | `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |

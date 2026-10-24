@@ -72,8 +72,9 @@ Quote the expression so your shell doesn't expand `*`.
 # Explain a schedule: plain English, next runs, DST warnings
 tzmeet cron "30 2 * * *" --zone America/New_York
 
-# Convert between Unix, Kubernetes, Spring and Quartz syntax
+# Convert between Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins and systemd syntax
 tzmeet cron "0 9 * * 1-5" --to quartz          # 0 0 9 ? * MON-FRI
+tzmeet cron "0 9 * * 1-5" --to systemd         # Mon..Fri *-*-* 09:00:00
 
 # "I want 09:00 Dhaka, but the server runs in UTC"
 tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
@@ -82,7 +83,7 @@ tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
 tzmeet cron "every weekday at 9am Dhaka" --to kubernetes
 ```
 
-When daylight saving changes the gap between the zones, `--to-zone` lists one expression per period and recommends setting the scheduler's own time zone instead (`CRON_TZ`, `spec.timeZone`, `@Scheduled(zone)`, Quartz `inTimeZone`).
+When daylight saving changes the gap between the zones, `--to-zone` lists one expression per period and recommends setting the scheduler's own time zone instead (`CRON_TZ`, `spec.timeZone`, `@Scheduled(zone)`, Quartz `inTimeZone`, `ScheduleExpressionTimezone`, GitHub `timezone:`, Jenkins `TZ=`, or a zone at the end of `OnCalendar=`).
 
 ### Check schedules in CI
 
@@ -90,7 +91,7 @@ When daylight saving changes the gap between the zones, `--to-zone` lists one ex
 tzmeet cron --check . --zone America/New_York
 ```
 
-Scans crontabs (`crontab`, `*.crontab`, `*.cron`, honouring `CRON_TZ=` lines) and Kubernetes CronJob YAML (`*.yaml`, `*.yml`). It exits with 1 when a run would be skipped, delayed or doubled by a clock change, or a schedule is invalid. Warnings (a CronJob without `spec.timeZone`, day-of-month and day-of-week both set) fail only with `--strict`. `--zone` is used where a file sets no time zone. Use `--format github` for pull-request annotations, or `--json`.
+Scans crontabs (`crontab`, `*.crontab`, `*.cron`, honouring `CRON_TZ=` lines), Kubernetes CronJobs and GitHub Actions workflows (`on.schedule`, with `timezone:` or UTC) in `*.yaml`/`*.yml`, systemd `*.timer` files (`OnCalendar=`), Jenkinsfiles (`cron('…')`, honouring a `TZ=` line) and EventBridge `cron(...)` schedules in CloudFormation, SAM, Serverless (YAML/JSON) or Terraform files (with a nearby `ScheduleExpressionTimezone`/`schedule_expression_timezone`, otherwise UTC). It exits with 1 when a run would be skipped, delayed or doubled by a clock change, or a schedule is invalid. Warnings (a CronJob without `spec.timeZone`, day-of-month and day-of-week both set, a repeated hour where the engine doesn't document what it does, a UTC-only schedule whose local time moves with DST in the `--zone` you give) fail only with `--strict`. `--zone` is used where a file sets no time zone. Use `--format github` for pull-request annotations, or `--json`.
 
 As a GitHub Action:
 

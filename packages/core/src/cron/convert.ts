@@ -125,10 +125,14 @@ function renderWeekdays(
   dialect: CronDialect,
 ): string | null {
   const iso = [...new Set(weekdays)];
-  const names = dialect === "spring" || dialect === "quartz";
+  const names =
+    dialect === "spring" ||
+    dialect === "quartz" ||
+    dialect === "eventbridge" ||
+    dialect === "systemd";
   const extra: string[] = [];
   for (const part of specials) {
-    if (!names) return null;
+    if (!names || dialect === "systemd") return null;
     if (part.kind === "lastWeekdayOf") extra.push(`${dayNames[part.weekday]}L`);
     if (part.kind === "nth") extra.push(`${dayNames[part.weekday]}#${part.n}`);
   }
@@ -136,20 +140,22 @@ function renderWeekdays(
   const quartzOrder = (value: number) => (value % 7) + 1;
   const base = !iso.length
     ? ""
-    : dialect === "quartz"
-      ? compact(
-          iso.map(quartzOrder),
-          1,
-          7,
-          (value) => dayNames[value === 1 ? 7 : value - 1]!,
-        )
-      : names
-        ? compact(iso, 1, 7, (value) => dayNames[value]!)
-        : compact(
-            iso.map((value) => value % 7),
-            0,
-            6,
-          );
+    : dialect === "systemd"
+      ? compact(iso, 1, 7, (value) => systemdDays[value]!).replaceAll("-", "..")
+      : dialect === "quartz" || dialect === "eventbridge"
+        ? compact(
+            iso.map(quartzOrder),
+            1,
+            7,
+            (value) => dayNames[value === 1 ? 7 : value - 1]!,
+          )
+        : names
+          ? compact(iso, 1, 7, (value) => dayNames[value]!)
+          : compact(
+              iso.map((value) => value % 7),
+              0,
+              6,
+            );
   return [base, ...extra].filter(Boolean).join(",");
 }
 
@@ -160,7 +166,12 @@ function renderDayOfMonth(
   const special = field.parts.filter(
     (part) => part.kind !== "any" && part.kind !== "range",
   );
-  if (special.length && dialect !== "spring" && dialect !== "quartz")
+  if (
+    special.length &&
+    dialect !== "spring" &&
+    dialect !== "quartz" &&
+    dialect !== "eventbridge"
+  )
     return null;
   const plain: CronField = {
     ...field,
@@ -196,19 +207,64 @@ interface Texts {
   dow: string;
   year?: string;
 }
-const assemble = (dialect: CronDialect, texts: Texts) =>
-  (dialect === "unix" || dialect === "kubernetes"
-    ? [texts.minute, texts.hour, texts.dom, texts.month, texts.dow]
-    : [
-        texts.second,
-        texts.minute,
-        texts.hour,
-        texts.dom,
-        texts.month,
-        texts.dow,
-        ...(dialect === "quartz" && texts.year ? [texts.year] : []),
-      ]
+const systemdDays = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function systemdComponent(
+  text: string,
+  min: number,
+  max: number,
+  pad: boolean,
+): string {
+  const two = (value: string) =>
+    pad && /^\d$/.test(value) ? `0${value}` : value;
+  return text
+    .split(",")
+    .map((item) => {
+      if (item === "*" || item === "?") return "*";
+      const step = /^(?:\*|(\d+)(?:-(\d+))?)\/(\d+)$/.exec(item);
+      if (step) {
+        const from = Number(step[1] ?? min);
+        const to = Number(step[2] ?? max);
+        if (to === max) return `${two(String(from))}/${step[3]}`;
+        const values: string[] = [];
+        for (let value = from; value <= to; value += Number(step[3]))
+          values.push(two(String(value)));
+        return values.join(",");
+      }
+      const range = /^(\d+)-(\d+)$/.exec(item);
+      return range ? `${two(range[1]!)}..${two(range[2]!)}` : two(item);
+    })
+    .join(",");
+}
+const assemble = (dialect: CronDialect, texts: Texts) => {
+  if (dialect === "systemd") {
+    const date = `${systemdComponent(texts.year ?? "*", 1970, 2199, false)}-${systemdComponent(texts.month, 1, 12, true)}-${systemdComponent(texts.dom, 1, 31, true)}`;
+    const time = `${systemdComponent(texts.hour, 0, 23, true)}:${systemdComponent(texts.minute, 0, 59, true)}:${systemdComponent(texts.second, 0, 59, true)}`;
+    return `${texts.dow === "*" ? "" : `${texts.dow} `}${date} ${time}`;
+  }
+  if (dialect === "eventbridge")
+    return `cron(${[texts.minute, texts.hour, texts.dom, texts.month, texts.dow, texts.year ?? "*"].join(" ")})`;
+  return (
+    dialect === "unix" ||
+    dialect === "kubernetes" ||
+    dialect === "github" ||
+    dialect === "jenkins"
+      ? [texts.minute, texts.hour, texts.dom, texts.month, texts.dow]
+      : [
+          texts.second,
+          texts.minute,
+          texts.hour,
+          texts.dom,
+          texts.month,
+          texts.dow,
+          ...(dialect === "quartz" && texts.year ? [texts.year] : []),
+        ]
   ).join(" ");
+};
+/** Dialects whose expressions have no seconds field. */
+const minuteOnly = (dialect: CronDialect) =>
+  ["unix", "kubernetes", "github", "jenkins", "eventbridge"].includes(dialect);
+const sundayFirst = (dialect: CronDialect) =>
+  dialect === "quartz" || dialect === "eventbridge";
 
 export function convertCronDialect(
   expression: string,
@@ -224,8 +280,12 @@ export function convertCronDialect(
     notes: [],
   };
   const target = cronDialectName(to);
-  const minuteResolution = to === "unix" || to === "kubernetes";
+  const minuteResolution = minuteOnly(to);
   if (cron.macro) result.notes.push(`${cron.macro} is written out in full.`);
+  if (cron.hashed?.length)
+    result.notes.push(
+      "Jenkins H was replaced by the first possible value; Jenkins itself picks one per job from its name.",
+    );
   if (cron.prefixZone)
     result.notes.push(
       `Set the time zone (${cron.prefixZone}) in the scheduler; it isn't part of the expression.`,
@@ -245,11 +305,17 @@ export function convertCronDialect(
     );
   let year: string | undefined;
   if (cron.year && !cron.year.any) {
-    if (to !== "quartz")
+    if (to !== "quartz" && to !== "eventbridge" && to !== "systemd")
       result.problems.push(
         `${target} has no year field, so it can't limit runs to ${cron.year.text}.`,
       );
-    else year = renderField(cron.year, 1970, 2099, true);
+    else
+      year = renderField(
+        cron.year,
+        1970,
+        to === "quartz" ? 2099 : 2199,
+        to === "quartz",
+      );
   }
 
   const minute = renderField(cron.minute, 0, 59, to === "quartz");
@@ -269,12 +335,12 @@ export function convertCronDialect(
       `${target} doesn't support L or # in day-of-week (${cron.dayOfWeek.text}).`,
     );
   if (
-    cron.dialect === "quartz" &&
-    to !== "quartz" &&
+    sundayFirst(cron.dialect) &&
+    !sundayFirst(to) &&
     /\d/.test(cron.dayOfWeek.text)
   )
     result.notes.push(
-      "Day-of-week numbers are converted: Quartz counts Sunday as 1, the others count Monday as 1.",
+      `Day-of-week numbers are converted: ${cronDialectName(cron.dialect)} counts Sunday as 1, ${target} counts Monday as 1.`,
     );
   if (result.problems.length) return result;
 
@@ -297,8 +363,9 @@ export function convertCronDialect(
         ? ["?", dowText]
         : [domText, dowText];
   const single = (domText: string, dowText: string) => {
-    const [d, w] =
-      to === "quartz" ? quartzDays(domText, dowText) : [domText, dowText];
+    const [d, w] = sundayFirst(to)
+      ? quartzDays(domText, dowText)
+      : [domText, dowText];
     return build(d!, w!);
   };
 
@@ -314,16 +381,18 @@ export function convertCronDialect(
       `${target} can't say "day ${cron.dayOfMonth.text} or ${renderWeekdays(cron.dayOfWeek.values, dowSpecials, "quartz")}" in one expression, so this needs two schedules.`,
     );
   };
+
+  const orsDays = to === "unix" || to === "kubernetes" || to === "github";
   if (cron.dayMatch === "or") {
-    if (to === "unix" || to === "kubernetes")
-      result.expressions.push(build(dom!, dow!));
+    if (orsDays) result.expressions.push(build(dom!, dow!));
     else twoSchedules();
-  } else if (to === "spring") result.expressions.push(build(dom!, dow!));
-  else if (to === "unix" && dom!.startsWith("*"))
+  } else if (to === "spring" || to === "jenkins" || to === "systemd")
+    result.expressions.push(build(dom!, dow!));
+  else if ((to === "unix" || to === "github") && dom!.startsWith("*"))
     result.expressions.push(build(dom!, dow!));
   else
     result.problems.push(
-      `${target} can't require both day-of-month (${cron.dayOfMonth.text}) and day-of-week (${cron.dayOfWeek.text}); ${to === "quartz" ? "Quartz allows only one of them" : "it runs when either matches"}.`,
+      `${target} can't require both day-of-month (${cron.dayOfMonth.text}) and day-of-week (${cron.dayOfWeek.text}); ${sundayFirst(to) ? `${target} allows only one of them` : "it runs when either matches"}.`,
     );
   return result;
 }
@@ -436,6 +505,18 @@ export function nativeSetting(
       return `@Scheduled(cron = "${expression}", zone = "${zone}")`;
     case "quartz":
       return `CronScheduleBuilder.cronSchedule("${expression}")\n    .inTimeZone(TimeZone.getTimeZone("${zone}"))`;
+    case "eventbridge": {
+      const wrapped = /^cron\(/i.test(expression)
+        ? expression
+        : `cron(${expression})`;
+      return `ScheduleExpression: "${wrapped}"\nScheduleExpressionTimezone: "${zone}"`;
+    }
+    case "github":
+      return `on:\n  schedule:\n    - cron: "${expression}"\n      timezone: "${zone}"`;
+    case "jenkins":
+      return `TZ=${zone}\n${expression}`;
+    case "systemd":
+      return `OnCalendar=${expression.replace(/\s+(?:UTC|[A-Za-z_]+\/[A-Za-z_/+-]+)$/, "")} ${zone}`;
   }
 }
 

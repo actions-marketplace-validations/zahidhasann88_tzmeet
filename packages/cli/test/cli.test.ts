@@ -1284,6 +1284,88 @@ describe("cron --check", () => {
     ).toEqual(["dst-double", "dst-skip", "k8s-no-timezone", "dom-dow-or"]);
   });
 
+  it("checks GitHub workflows, systemd timers, Jenkinsfiles and EventBridge schedules", () => {
+    mkdirSync(join(cwd, ".github", "workflows"), { recursive: true });
+    writeFileSync(
+      join(cwd, ".github", "workflows", "nightly.yml"),
+      [
+        "name: nightly",
+        "on:",
+        "  schedule:",
+        '    - cron: "30 2 * * *"',
+        '      timezone: "America/New_York"',
+        '    - cron: "0 9 * * 1-5"',
+        "jobs: {}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "backup.timer"),
+      "[Timer]\nOnCalendar=*-*-* 01:30:00 Europe/London\nPersistent=true\n",
+    );
+    writeFileSync(
+      join(cwd, "Jenkinsfile"),
+      [
+        "pipeline {",
+        "  triggers {",
+        "    cron('''TZ=Europe/London",
+        "H 1 * * *''')",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "template.yaml"),
+      [
+        "Resources:",
+        "  Nightly:",
+        "    Type: AWS::Scheduler::Schedule",
+        "    Properties:",
+        '      ScheduleExpression: "cron(30 2 * * ? *)"',
+        "      ScheduleExpressionTimezone: America/New_York",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "main.tf"),
+      'resource "aws_scheduler_schedule" "x" {\n  schedule_expression = "cron(0 9 ? * MON-FRI *)"\n}\n',
+    );
+    writeFileSync(join(cwd, "package.json"), '{"name": "no-schedules"}\n');
+    const result = JSON.parse(
+      invoke([
+        "cron",
+        "--check",
+        ".",
+        "--json",
+        "--zone",
+        "Europe/London",
+        ...from,
+      ]).stdout,
+    );
+    expect(result).toMatchObject({ files: 5, schedules: 6 });
+    const found = result.findings.map(
+      (finding: { file: string; line: number; code: string }) =>
+        `${finding.file}:${finding.line} ${finding.code}`,
+    );
+    expect(found).toEqual(
+      expect.arrayContaining([
+        ".github/workflows/nightly.yml:4 dst-late",
+        ".github/workflows/nightly.yml:6 utc-shift",
+        "backup.timer:2 dst-skip",
+        "backup.timer:2 dst-maybe-double",
+        "Jenkinsfile:4 dst-double",
+        "template.yaml:5 dst-skip",
+        "main.tf:2 utc-shift",
+      ]),
+    );
+    expect(
+      result.findings.find(
+        (finding: { code: string }) => finding.code === "utc-shift",
+      ).message,
+    ).toContain("Runs in UTC, so its local time moves with daylight saving.");
+  });
+
   it("reports bad lines, bad zones and missing paths", () => {
     writeFileSync(
       join(cwd, "bad.crontab"),
