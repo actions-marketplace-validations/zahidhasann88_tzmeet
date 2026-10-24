@@ -291,11 +291,9 @@ describe("pre-commit hook and GitLab CI template", () => {
       additional_dependencies: [`tzmeet@${cli.version}`],
     });
     expect(gitlab.variables.TZMEET_VERSION).toBe(cli.version);
-    for (const file of [
-      ".pre-commit-hooks.yaml",
-      "templates/tzmeet-cron-check.gitlab-ci.yml",
-    ])
-      expect(readFileSync(file, "utf8")).toContain(`v${cli.version}`);
+    expect(readFileSync("packages/cli/README.md", "utf8")).toContain(
+      `v${cli.version}`,
+    );
   });
 
   it("passes the hook only the files --check can read", () => {

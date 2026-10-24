@@ -1,20 +1,7 @@
-# GitLab CI job that fails on cron schedules daylight saving skips, delays or runs twice,
-# and shows each problem in merge requests through a Code Quality report.
-#
-# Use it from your .gitlab-ci.yml:
-#
-#   include:
-#     - remote: https://raw.githubusercontent.com/zahidhasann88/tzmeet/v0.4.0/templates/tzmeet-cron-check.gitlab-ci.yml
-#
-#   variables:
-#     TZMEET_ZONE: America/New_York # optional: zone for schedules that set none
-#
-# Override the job (stage, rules, image) by redefining tzmeet-cron-check in your file.
-
 variables:
-  TZMEET_PATHS: "." # files or folders to scan, separated by spaces
+  TZMEET_PATHS: "."
   TZMEET_ZONE: "UTC"
-  TZMEET_STRICT: "false" # "true" also fails on warnings
+  TZMEET_STRICT: "false"
   TZMEET_VERSION: "0.4.0"
 
 tzmeet-cron-check:
@@ -22,7 +9,6 @@ tzmeet-cron-check:
   image: node:22-alpine
   script:
     - strict=""; if [ "$TZMEET_STRICT" = "true" ]; then strict="--strict"; fi
-    # The report for merge requests, then the same findings as text for the job log.
     - npx --yes "tzmeet@${TZMEET_VERSION}" cron --check $TZMEET_PATHS --zone "$TZMEET_ZONE" --format gitlab $strict > gl-code-quality-report.json && status=0 || status=$?
     - npx --yes "tzmeet@${TZMEET_VERSION}" cron --check $TZMEET_PATHS --zone "$TZMEET_ZONE" $strict || true
     - exit $status
