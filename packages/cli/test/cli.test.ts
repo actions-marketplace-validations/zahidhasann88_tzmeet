@@ -1388,7 +1388,7 @@ describe("cron --check", () => {
     const sarif = JSON.parse(invoke(["cron", "--check", "k8s", "--format", "sarif", ...from]).stdout);
     expect(sarif.version).toBe("2.1.0");
     const run = sarif.runs[0];
-    expect(run.tool.driver).toMatchObject({ name: "tzmeet", version: "0.4.0" });
+    expect(run.tool.driver).toMatchObject({ name: "tzmeet", version: "0.5.0" });
     expect(run.tool.driver.rules.map((rule: { id: string }) => rule.id)).toEqual(["dom-dow-or", "dst-double", "dst-skip", "k8s-no-timezone"]);
     expect(run.results[0]).toMatchObject({
       ruleId: "dst-double",

@@ -3,5 +3,5 @@
   description: Fail on cron schedules that daylight saving skips, delays or runs twice.
   entry: tzmeet cron --check
   language: node
-  additional_dependencies: ["tzmeet@0.4.0"]
+  additional_dependencies: ["tzmeet@0.5.0"]
   files: (?i)((^|/)(crontab|jenkinsfile)|\.(crontab|cron|timer|ya?ml|tf|json|jenkinsfile))$

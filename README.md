@@ -76,7 +76,7 @@ Add your team at **[zahidhasann88.github.io/tzmeet/#/team](https://zahidhasann88
 tzmeet also explains cron schedules (Unix, Kubernetes, Spring, Quartz, AWS EventBridge, GitHub Actions, Jenkins, systemd timers, or plain English like "every weekday at 9am Dhaka"), converts them between syntaxes and time zones, and checks them for daylight saving problems: in the [web app](https://zahidhasann88.github.io/tzmeet/cron/), with `npx tzmeet cron`, or in CI with the GitHub Action, a [pre-commit hook or a GitLab CI template](packages/cli/README.md#check-schedules-in-ci):
 
 ```yaml
-- uses: zahidhasann88/tzmeet@v0.4.0
+- uses: zahidhasann88/tzmeet@v0.5.0
   with:
     paths: k8s/
 ```

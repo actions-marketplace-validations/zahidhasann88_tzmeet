@@ -100,7 +100,7 @@ Run it wherever you check code:
 **GitHub Action**
 
 ```yaml
-- uses: zahidhasann88/tzmeet@v0.4.0
+- uses: zahidhasann88/tzmeet@v0.5.0
   with:
     paths: k8s/ deploy/crontab
     zone: America/New_York   # where no time zone is set
@@ -122,7 +122,7 @@ Run it wherever you check code:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/zahidhasann88/tzmeet
-    rev: v0.4.0
+    rev: v0.5.0
     hooks:
       - id: tzmeet-cron-check
         args: [--zone, America/New_York]   # optional
@@ -133,7 +133,7 @@ repos:
 ```yaml
 # .gitlab-ci.yml
 include:
-  - remote: https://raw.githubusercontent.com/zahidhasann88/tzmeet/v0.4.0/templates/tzmeet-cron-check.gitlab-ci.yml
+  - remote: https://raw.githubusercontent.com/zahidhasann88/tzmeet/v0.5.0/templates/tzmeet-cron-check.gitlab-ci.yml
 
 variables:
   TZMEET_PATHS: k8s/ deploy/crontab   # default: .
