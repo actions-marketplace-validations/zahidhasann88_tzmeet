@@ -778,7 +778,9 @@ test.describe("team hours page", () => {
     await expect(best).toContainText(
       "No time when everyone works this week. Most overlap: 2 of 3",
     );
-    await expect(best).toContainText("Mon 26 Oct, 13:00–17:30 4 h 30 min · Ana, Ben");
+    await expect(best).toContainText(
+      "Mon 26 Oct, 13:00–17:30 4 h 30 min · Ana, Ben",
+    );
     await expect(page.locator(".team-grid tbody tr")).toHaveCount(7);
     await expect(
       page.locator(".team-grid tbody tr").first().locator("td").nth(20),
@@ -822,13 +824,19 @@ test.describe("team hours page", () => {
     await page.getByLabel("Time zone, person 1").fill("Asia/Dhaka");
     await expect(page.getByLabel("Fri weekend, person 1")).toBeChecked();
     await page.getByLabel("Name, person 2").fill("Ana");
-    await page.getByLabel("My hours link").fill("https://example.com/tzmeet/me/#n=Ben&z=America%2FNew_York&w=09:00-17:00&d=67");
+    await page
+      .getByLabel("My hours link")
+      .fill(
+        "https://example.com/tzmeet/me/#n=Ben&z=America%2FNew_York&w=09:00-17:00&d=67",
+      );
     await page.getByRole("button", { name: "Add from link" }).click();
     await expect(page.getByLabel("Name, person 3")).toHaveValue("Ben");
     await expect(page.getByLabel("Work ends, person 3")).toHaveValue("17:00");
     await page.getByLabel("My hours link").fill("https://example.com/");
     await page.getByRole("button", { name: "Add from link" }).click();
-    await expect(page.getByRole("alert")).toHaveText("That isn't a My hours link.");
+    await expect(page.getByRole("alert")).toHaveText(
+      "That isn't a My hours link.",
+    );
     await page.getByRole("button", { name: "Copy team link" }).click();
     const link = await page.evaluate(
       () => document.documentElement.dataset.clipboard!,
@@ -840,7 +848,9 @@ test.describe("team hours page", () => {
       opened.getByRole("heading", { name: "When Platform is available." }),
     ).toBeVisible();
     await expect(opened.locator(".team-people li")).toHaveCount(3);
-    await opened.getByRole("button", { name: "Edit a copy of this team" }).click();
+    await opened
+      .getByRole("button", { name: "Edit a copy of this team" })
+      .click();
     await expect(opened.getByLabel("Name, person 3")).toHaveValue("Ben");
   });
 
@@ -848,4 +858,56 @@ test.describe("team hours page", () => {
     const teamPage = await (await page.request.get("./team/")).text();
     expect(teamPage).toContain("og/tzmeet-team.png");
   });
+});
+
+test("downloads or subscribes to a country's public holidays", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T09:35:00Z"));
+  await page.goto("./me/#n=Zahid&z=Asia%2FDhaka&w=09:00-18:00&d=56&h=BD");
+  const holidays = page.locator(".me-holidays");
+  await expect(holidays).toBeVisible();
+  const downloading = page.waitForEvent("download");
+  await holidays
+    .getByRole("button", {
+      name: "Download Bangladesh holidays for Zahid (.ics)",
+    })
+    .click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe("tzmeet-holidays-BD-2026-2027.ics");
+  const text = await readFile(await download.path(), "utf8");
+  expect(text).toContain("X-WR-CALNAME:Public holidays: Bangladesh");
+  expect(text).toContain("DTSTART;VALUE=DATE:20271216");
+
+  await holidays.getByText("Subscribe in your calendar").click();
+  await expect(
+    holidays.getByRole("link", { name: "Apple Calendar or Outlook" }),
+  ).toHaveAttribute(
+    "href",
+    "webcal://tzmeet-api.onrender.com/v1/holidays.ics?preset=BD",
+  );
+  await expect(
+    holidays.getByRole("link", { name: "Google Calendar" }),
+  ).toHaveAttribute(
+    "href",
+    /^https:\/\/calendar\.google\.com\/calendar\/r\?cid=webcal%3A%2F%2F/,
+  );
+  await expect(
+    holidays.getByLabel("Bangladesh holiday calendar address for Zahid"),
+  ).toHaveValue("https://tzmeet-api.onrender.com/v1/holidays.ics?preset=BD");
+  const audit = await new AxeBuilder({ page })
+    .include(".me-holidays")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+
+  // The meeting finder offers the same links under each city's holiday setting.
+  await page.goto("./");
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByLabel("Dhaka public holidays").selectOption("BD");
+  await expect(
+    page.getByRole("button", {
+      name: "Download Bangladesh holidays for Dhaka (.ics)",
+    }),
+  ).toBeVisible();
 });

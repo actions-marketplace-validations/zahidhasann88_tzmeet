@@ -127,4 +127,5 @@ export {
   calendarText,
   calendarCollectionText,
   recurringCalendarText,
+  holidayCalendarText,
 } from "./invite-format.js";

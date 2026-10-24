@@ -13,6 +13,7 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 - GitLab CI template (`templates/tzmeet-cron-check.gitlab-ci.yml`) that fails the pipeline on DST problems and shows them in merge requests.
 - Native time-zone snippets for the new engines in `convertCronZone` (`ScheduleExpressionTimezone`, `timezone:`, `TZ=`, `OnCalendar=… zone`).
 - Team hours page (`#/team`, shared through a `/team/` page with its own link preview): one link with up to 12 people, each with their own zone, work hours, weekend and public holidays. Shows who's working now, the longest stretches this week when everyone (or the most people) works, and a 7-day grid shaded by how many people are working, in the viewer's time zone. People can be added from their My hours links. "Find a meeting time" opens the meeting finder with the team; people in the same zone become one city with the hours they share.
+- Holiday calendars: `GET /v1/holidays?preset=BD&year=2027` (JSON) and `GET /v1/holidays.ics?preset=BD`, a feed for this year and next that calendar apps can subscribe to (all-day events marked free, approximate dates labelled, stable UIDs, daily refresh hint, `ETag` and caching). In the web app, every holiday preset has "Download holidays (.ics)", made in the browser, and "Subscribe in your calendar" links for Google Calendar, Apple Calendar and Outlook; shared My hours pages offer them for that person's country. Also `holidayCalendarText` in `@tzmeet/core`.
 
 ### Changed
 

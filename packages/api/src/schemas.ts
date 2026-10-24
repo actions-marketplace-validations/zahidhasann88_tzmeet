@@ -1,5 +1,11 @@
 import { z } from "@hono/zod-openapi";
-import { conversionSchema, cronDialects, findSlotsSchema, type CronDialect } from "@tzmeet/core";
+import {
+  conversionSchema,
+  cronDialects,
+  findSlotsSchema,
+  holidayPresetIds,
+  type CronDialect,
+} from "@tzmeet/core";
 
 export const API_LIMITS = {
   zones: 8,
@@ -273,6 +279,48 @@ export const slotsResultSchema = z
     }),
   })
   .openapi("SlotsResponse");
+const presetQuery = z.enum(holidayPresetIds).openapi({
+  example: "BD",
+  description:
+    "Holiday preset: BD (Bangladesh), GB-ENG (England and Wales), IN (India, central government), PK (Pakistan), AE (UAE) or US (federal)",
+});
+export const holidaysQuerySchema = z
+  .object({
+    preset: presetQuery,
+    year: z
+      .string()
+      .regex(/^\d{4}$/, "year must be a four-digit year from 2000 to 2100")
+      .transform(Number)
+      .refine(
+        (year) => year >= 2000 && year <= 2100,
+        "year must be a four-digit year from 2000 to 2100",
+      )
+      .optional()
+      .openapi({
+        type: "string",
+        example: "2027",
+        description: "Default: this year (UTC)",
+      }),
+  })
+  .strict();
+export const holidaysIcsQuerySchema = z
+  .object({ preset: presetQuery })
+  .strict();
+export const holidaysResultSchema = z
+  .object({
+    preset: z.enum(holidayPresetIds),
+    name: z.string(),
+    year: z.number().int(),
+    holidays: z.array(
+      z.object({
+        date: z.string(),
+        name: z.string(),
+        approximate: z.boolean(),
+      }),
+    ),
+    note: z.string().nullable(),
+  })
+  .openapi("HolidaysResponse");
 export const healthSchema = z.object({
   status: z.literal("ok"),
   version: z.string(),
@@ -348,7 +396,13 @@ export const cronResultSchema = z
         local: z.string(),
         scheduled: z.string(),
         note: z
-          .enum(["gap-catch-up", "fold-once", "fold-first", "fold-second", "fold-maybe-twice"])
+          .enum([
+            "gap-catch-up",
+            "fold-once",
+            "fold-first",
+            "fold-second",
+            "fold-maybe-twice",
+          ])
           .optional(),
         zones: z.array(cronZoneSchema),
       }),
@@ -392,14 +446,10 @@ export const recurringQuerySchema = slotsGetQuerySchema
       description: "Meeting time (HH:mm) in the first zone",
     }),
     weeks,
-    format: z
-      .enum(["json", "ics"])
-      .default("json")
-      .openapi({
-        example: "json",
-        description:
-          "json report, or ics: the weekly series as a calendar file",
-      }),
+    format: z.enum(["json", "ics"]).default("json").openapi({
+      example: "json",
+      description: "json report, or ics: the weekly series as a calendar file",
+    }),
   });
 const recurringZoneSchema = z.object({
   id: z.string(),
@@ -447,9 +497,7 @@ export const recurringResultSchema = z
   })
   .openapi("RecurringImpact");
 
-const dialectEnum = z.enum(
-  cronDialects as [CronDialect, ...CronDialect[]],
-);
+const dialectEnum = z.enum(cronDialects as [CronDialect, ...CronDialect[]]);
 export const cronConvertQuerySchema = z
   .object({
     expression: z
@@ -520,12 +568,10 @@ export const cronNaturalQuerySchema = z
       .min(1, "text is required")
       .max(200, "text must be at most 200 characters")
       .openapi({ example: "every weekday at 9am Dhaka" }),
-    dialect: dialectEnum
-      .optional()
-      .openapi({
-        example: "kubernetes",
-        description: "Syntax to write (default: unix)",
-      }),
+    dialect: dialectEnum.optional().openapi({
+      example: "kubernetes",
+      description: "Syntax to write (default: unix)",
+    }),
   })
   .strict();
 export const cronNaturalResultSchema = z

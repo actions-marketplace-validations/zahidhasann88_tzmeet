@@ -42,6 +42,7 @@ if (result.slots.length === 0) {
 - `convertCronZone({ expression, fromZone, toZone, from })` – rewrites a schedule for a scheduler in another time zone, with one expression per daylight saving period and the scheduler's own time-zone setting as the recommended fix.
 - `recurringImpact({ zones, startDate, time, weeks?, durationMinutes? })` – follows a weekly meeting (fixed at `time` in the first zone) through the coming weeks and shows where each zone's local time moves because of daylight saving, and why.
 - `fairRotation(result, { size: 2 | 3 })` – picks times from a search to alternate week by week, so the inconvenient slot is shared instead of always falling on the same city.
+- `holidayCalendarText(preset, { years, created })` – a holiday preset as an `.ics` calendar of all-day events, with stable IDs so subscribed calendars update instead of duplicating.
 - `getPrayerWindows(date, rule)` – prayer times for a day.
 - `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
 

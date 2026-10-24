@@ -95,7 +95,7 @@ You can change all of these for each city.
 ## Good to know
 
 - Prayer times are calculated and approximate. Check your local mosque timetable.
-- Public holidays can be switched on per city for Bangladesh, India, Pakistan, the UAE, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date.
+- Public holidays can be switched on per city for Bangladesh, India, Pakistan, the UAE, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date. Each country's holidays can also be downloaded as a calendar file or subscribed to in Google, Apple or Outlook calendar.
 - Each city can have different hours for a date range, such as shorter Ramadan office hours (Ramadan dates are calculated and approximate).
 - For recurring meetings, tzmeet can suggest 2 or 3 times to alternate week by week, so no city always gets the early or late slot.
 - Mark a city's attendees as optional: they never block a time, but times they can attend rank higher.

@@ -2733,3 +2733,44 @@ input[aria-invalid="true"] {
     white-space: nowrap;
   }
 }
+.holiday-links {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  margin: -4px 0 12px;
+}
+.holiday-links .text-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.holiday-links .text-button svg {
+  width: 14px;
+}
+.holiday-links summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+.holiday-links a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.holiday-links details[open] {
+  display: grid;
+  gap: 6px;
+}
+.holiday-links ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.holiday-links .full-field {
+  margin: 0;
+}
+.me-holidays .holiday-links {
+  margin: 10px 0 0;
+}

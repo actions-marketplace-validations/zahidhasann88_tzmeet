@@ -20,6 +20,10 @@ import {
   parseScheduleInput,
   recurringImpact,
   recurringCalendarText,
+  holidayCalendarText,
+  holidayPresets,
+  presetHolidays,
+  presetNote,
   fairRotation,
   validateInput,
   ScheduleInputError,
@@ -50,6 +54,9 @@ import {
   recurringQuerySchema,
   recurringResultSchema,
   healthSchema,
+  holidaysIcsQuerySchema,
+  holidaysQuerySchema,
+  holidaysResultSchema,
   resultQuerySchema,
   slotsGetQuerySchema,
   slotsResultSchema,
@@ -276,6 +283,43 @@ const getRecurring = createRoute({
     ...errorResponses,
   },
 });
+const getHolidays = createRoute({
+  method: "get",
+  path: "/v1/holidays",
+  tags: ["Holidays"],
+  summary: "A holiday preset's public holidays for one year",
+  request: { query: holidaysQuerySchema },
+  responses: {
+    200: {
+      description:
+        "Dates, names and whether each date is approximate (moon sighting), with a note when part of the year's list isn't available",
+      content: json(holidaysResultSchema),
+    },
+    ...errorResponses,
+  },
+});
+const getHolidaysCalendar = createRoute({
+  method: "get",
+  path: "/v1/holidays.ics",
+  tags: ["Holidays"],
+  summary:
+    "Subscribe to a holiday preset in Google, Apple or Outlook calendar (this year and next)",
+  request: { query: holidaysIcsQuerySchema },
+  responses: {
+    200: {
+      description:
+        "All-day events; approximate dates are marked. Stable UIDs, so calendar refreshes update events instead of duplicating them",
+      content: {
+        "text/calendar": {
+          schema: z.string(),
+          example: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n",
+        },
+      },
+    },
+    304: { description: "Not modified (If-None-Match matched the ETag)" },
+    ...errorResponses,
+  },
+});
 const getHealth = createRoute({
   method: "get",
   path: "/v1/health",
@@ -294,6 +338,8 @@ const methods: Record<string, readonly string[]> = {
   "/v1/cron/convert": ["GET", "HEAD"],
   "/v1/cron/natural": ["GET", "HEAD"],
   "/v1/recurring": ["GET", "HEAD"],
+  "/v1/holidays": ["GET", "HEAD"],
+  "/v1/holidays.ics": ["GET", "HEAD"],
   "/v1/health": ["GET", "HEAD"],
   "/openapi.json": ["GET", "HEAD"],
   "/docs": ["GET", "HEAD"],
@@ -587,6 +633,46 @@ export function createApp(options: AppOptions = {}) {
       );
     }
     return c.json(impact, 200);
+  });
+  app.openapi(getHolidays, (c) => {
+    const { preset, year = now().getUTCFullYear() } = c.req.valid("query");
+    if (!options.apiKeys?.length)
+      c.header("Cache-Control", "public, max-age=86400");
+    return c.json(
+      {
+        preset,
+        name: holidayPresets[preset],
+        year,
+        holidays: presetHolidays(preset, year),
+        note: presetNote(preset, year),
+      },
+      200,
+    );
+  });
+  app.openapi(getHolidaysCalendar, (c) => {
+    const { preset } = c.req.valid("query");
+    const today = now();
+    const year = today.getUTCFullYear();
+    const created = `${today.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    const body = holidayCalendarText(preset, {
+      years: [year, year + 1],
+      created,
+    });
+    let hash = 2166136261;
+    for (const char of body)
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    const etag = `"${preset}-${hash.toString(16)}"`;
+    c.header("ETag", etag);
+    if (!options.apiKeys?.length)
+      c.header("Cache-Control", "public, max-age=21600");
+    if (c.req.header("If-None-Match") === etag) return c.body(null, 304);
+    c.header(
+      "Content-Disposition",
+      `inline; filename="tzmeet-holidays-${preset}.ics"`,
+    );
+    return c.text(body, 200, {
+      "Content-Type": "text/calendar; charset=utf-8",
+    });
   });
   app.openapi(getHealth, (c) => {
     c.header("Cache-Control", "public, max-age=30");

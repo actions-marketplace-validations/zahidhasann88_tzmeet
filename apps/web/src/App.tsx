@@ -38,6 +38,7 @@ import {
   type WebState,
 } from "./state";
 import { downloadCalendar, inviteText } from "./invite";
+import HolidayCalendarLinks from "./holiday-links";
 import { makeTimeline } from "./timeline";
 import CronPage from "./Cron";
 import RecurringPanel from "./Recurring";
@@ -772,6 +773,7 @@ function HolidayPresetField({
       .slice(0, 3);
   }, [zone.holidayPreset, from]);
   return (
+    <>
     <label>
       Public holidays
       <select
@@ -809,6 +811,13 @@ function HolidayPresetField({
           </span>
         )}
     </label>
+    {zone.holidayPreset && (
+      <HolidayCalendarLinks
+        preset={zone.holidayPreset}
+        name={zone.label ?? zone.id}
+      />
+    )}
+    </>
   );
 }
 

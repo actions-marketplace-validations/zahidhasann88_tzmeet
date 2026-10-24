@@ -26,6 +26,8 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `GET /v1/cron/convert?expression=0 9 * * 1-5&to=quartz&zone=Asia/Dhaka&toZone=UTC` | Convert a cron expression to another syntax and/or a server's time zone |
 | `GET /v1/cron/natural?text=every weekday at 9am Dhaka&dialect=kubernetes` | Turn plain English into a cron expression |
 | `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |
+| `GET /v1/holidays?preset=BD&year=2027` | A country's public holidays for one year (approximate dates marked) |
+| `GET /v1/holidays.ics?preset=BD` | The same as a calendar feed for this year and next: subscribe in Google, Apple or Outlook calendar |
 | `GET /v1/health` | Health check |
 | `GET /docs` | Interactive docs |
 

@@ -9,6 +9,7 @@ import {
   type HolidayPreset,
 } from "@tzmeet/core";
 import Icon from "./Icon";
+import HolidayCalendarLinks from "./holiday-links";
 import { ZoneInput } from "./Cron";
 import { friendlyName } from "./state";
 import {
@@ -58,7 +59,6 @@ const meLabels: PersonLabels = {
   holidays: "Public holidays",
 };
 
-/** Name, zone, work hours, weekend and holidays for one person. */
 export function PersonFields({
   person,
   zones,
@@ -157,6 +157,12 @@ export function PersonFields({
           ))}
         </select>
       </label>
+      {person.holidayPreset && (
+        <HolidayCalendarLinks
+          preset={person.holidayPreset}
+          name={person.name || labels.holidays}
+        />
+      )}
     </>
   );
 }
@@ -393,19 +399,26 @@ function Availability({
         reached" is the hour either side. Daylight saving is handled for both
         zones.
       </p>
-      {holidays.length > 0 && (
+      {person.holidayPreset && (
         <div className="me-holidays">
-          <strong>Upcoming holidays for {owner}</strong>
-          <ul>
-            {holidays.map((holiday) => (
-              <li key={holiday.date + holiday.name}>
-                {DateTime.fromISO(holiday.date)
-                  .setLocale("en")
-                  .toFormat("ccc d LLL")}
-                : {holiday.name}
-              </li>
-            ))}
-          </ul>
+          {holidays.length > 0 ? (
+            <>
+              <strong>Upcoming holidays for {owner}</strong>
+              <ul>
+                {holidays.map((holiday) => (
+                  <li key={holiday.date + holiday.name}>
+                    {DateTime.fromISO(holiday.date)
+                      .setLocale("en")
+                      .toFormat("ccc d LLL")}
+                    : {holiday.name}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <strong>No holidays for {owner} in the next 30 days</strong>
+          )}
+          <HolidayCalendarLinks preset={person.holidayPreset} name={owner} />
         </div>
       )}
     </>
