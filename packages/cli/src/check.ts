@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { LineCounter, parseAllDocuments } from "yaml";
@@ -474,18 +475,113 @@ const escapeData = (text: string) =>
 const escapeProperty = (text: string) =>
   escapeData(text).replace(/:/g, "%3A").replace(/,/g, "%2C");
 
+export type CheckFormat = "text" | "github" | "gitlab" | "sarif";
+export const checkFormats: readonly CheckFormat[] = [
+  "text",
+  "github",
+  "gitlab",
+  "sarif",
+];
+
+/** Short titles for SARIF rules; codes not listed here use the code itself. */
+const ruleTitles: Record<string, string> = {
+  "dst-skip": "A clock change skips this run",
+  "dst-late": "A clock change delays this run",
+  "dst-double": "A clock change runs this twice",
+  "dst-maybe-double": "A clock change may run this twice",
+  "never-runs": "The schedule never runs",
+  "utc-shift": "A UTC schedule moves in local time with daylight saving",
+  "dom-dow-or":
+    "Day-of-month and day-of-week both set: runs when either matches",
+  "k8s-inline-timezone": "Time zone set inside the Kubernetes schedule",
+  "k8s-no-timezone": "Kubernetes CronJob without spec.timeZone",
+  "unknown-zone": "Unknown time zone",
+  invalid: "Invalid schedule",
+  unreadable: "File couldn't be read",
+};
+
+const detailOf = (finding: CheckFinding) =>
+  finding.schedule
+    ? ` [${finding.schedule}${finding.zone ? ` in ${finding.zone}` : ""}]`
+    : "";
+
+function formatGitlab(result: CheckResult): string {
+  const seen = new Map<string, number>();
+  const issues = result.findings.map((finding) => {
+    const key = [
+      finding.file,
+      finding.code,
+      finding.schedule ?? "",
+      finding.message,
+    ].join("\0");
+    const occurrence = (seen.get(key) ?? 0) + 1;
+    seen.set(key, occurrence);
+    return {
+      description: finding.message + detailOf(finding),
+      check_name: finding.code,
+      fingerprint: createHash("sha256")
+        .update(`${key}\0${occurrence}`)
+        .digest("hex"),
+      severity: finding.severity === "error" ? "critical" : "minor",
+      location: { path: finding.file, lines: { begin: finding.line } },
+    };
+  });
+  return `${JSON.stringify(issues, null, 2)}\n`;
+}
+
+function formatSarif(result: CheckResult, version: string): string {
+  const codes = [
+    ...new Set(result.findings.map((finding) => finding.code)),
+  ].sort();
+  const sarif = {
+    $schema: "https://json.schemastore.org/sarif-2.1.0.json",
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "tzmeet",
+            version,
+            informationUri: "https://github.com/zahidhasann88/tzmeet",
+            rules: codes.map((code) => ({
+              id: code,
+              shortDescription: { text: ruleTitles[code] ?? code },
+            })),
+          },
+        },
+        results: result.findings.map((finding) => ({
+          ruleId: finding.code,
+          ruleIndex: codes.indexOf(finding.code),
+          level: finding.severity,
+          message: { text: finding.message + detailOf(finding) },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: { uri: finding.file, uriBaseId: "%SRCROOT%" },
+                region: { startLine: finding.line },
+              },
+            },
+          ],
+        })),
+      },
+    ],
+  };
+  return `${JSON.stringify(sarif, null, 2)}\n`;
+}
+
 export function formatCheck(
   result: CheckResult,
-  format: "text" | "github",
+  format: CheckFormat,
+  version = "0.0.0",
 ): string {
+  if (format === "gitlab") return formatGitlab(result);
+  if (format === "sarif") return formatSarif(result, version);
   const errors = result.findings.filter(
     (finding) => finding.severity === "error",
   ).length;
   const warnings = result.findings.length - errors;
   const lines = result.findings.map((finding) => {
-    const detail = finding.schedule
-      ? ` [${finding.schedule}${finding.zone ? ` in ${finding.zone}` : ""}]`
-      : "";
+    const detail = detailOf(finding);
     return format === "github"
       ? `::${finding.severity} file=${escapeProperty(finding.file)},line=${finding.line},title=${escapeProperty("tzmeet cron check")}::${escapeData(finding.message + detail)}`
       : `${finding.file}:${finding.line}: ${finding.severity}: ${finding.message}${detail}`;

@@ -1366,6 +1366,42 @@ describe("cron --check", () => {
     ).toContain("Runs in UTC, so its local time moves with daylight saving.");
   });
 
+  it("writes GitLab Code Quality and SARIF reports", () => {
+    setup();
+    const gitlab = invoke(["cron", "--check", "k8s", "--format", "gitlab", ...from]);
+    expect(gitlab.code).toBe(1);
+    const issues = JSON.parse(gitlab.stdout) as {
+      check_name: string;
+      severity: string;
+      fingerprint: string;
+      location: { path: string; lines: { begin: number } };
+    }[];
+    expect(issues.map((issue) => [issue.check_name, issue.severity, issue.location.path, issue.location.lines.begin])).toEqual([
+      ["dst-double", "critical", "k8s/jobs.yaml", 6],
+      ["dst-skip", "critical", "k8s/jobs.yaml", 6],
+      ["k8s-no-timezone", "minor", "k8s/jobs.yaml", 15],
+      ["dom-dow-or", "minor", "k8s/jobs.yaml", 15],
+    ]);
+    expect(new Set(issues.map((issue) => issue.fingerprint)).size).toBe(4);
+    expect(JSON.parse(invoke(["cron", "--check", "k8s", "--format", "gitlab", ...from]).stdout)).toEqual(issues);
+
+    const sarif = JSON.parse(invoke(["cron", "--check", "k8s", "--format", "sarif", ...from]).stdout);
+    expect(sarif.version).toBe("2.1.0");
+    const run = sarif.runs[0];
+    expect(run.tool.driver).toMatchObject({ name: "tzmeet", version: "0.4.0" });
+    expect(run.tool.driver.rules.map((rule: { id: string }) => rule.id)).toEqual(["dom-dow-or", "dst-double", "dst-skip", "k8s-no-timezone"]);
+    expect(run.results[0]).toMatchObject({
+      ruleId: "dst-double",
+      ruleIndex: 1,
+      level: "error",
+      locations: [{ physicalLocation: { artifactLocation: { uri: "k8s/jobs.yaml" }, region: { startLine: 6 } } }],
+    });
+    expect(run.results[0].message.text).toContain("[30 1 * * * in Europe/London]");
+
+    writeFileSync(join(cwd, "ok.crontab"), "0 9 * * * /bin/true\n");
+    expect(invoke(["cron", "--check", "ok.crontab", "--format", "gitlab", ...from])).toMatchObject({ code: 0, stdout: "[]\n" });
+  });
+
   it("reports bad lines, bad zones and missing paths", () => {
     writeFileSync(
       join(cwd, "bad.crontab"),
@@ -1385,7 +1421,7 @@ describe("cron --check", () => {
     expect(missing.stderr).toContain("Cannot read nowhere");
     expect(
       invoke(["cron", "--check", ".", "--format", "xml"]).stderr,
-    ).toContain("--format must be text or github");
+    ).toContain("--format must be text, github, gitlab or sarif");
   });
 });
 

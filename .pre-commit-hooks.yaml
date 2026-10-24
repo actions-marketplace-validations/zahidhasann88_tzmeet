@@ -1,0 +1,14 @@
+# pre-commit hook (https://pre-commit.com). Use it from your .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/zahidhasann88/tzmeet
+#     rev: v0.4.0
+#     hooks:
+#       - id: tzmeet-cron-check
+#         args: [--zone, America/New_York] # optional: zone for schedules that set none
+- id: tzmeet-cron-check
+  name: tzmeet cron check
+  description: Fail on cron schedules that daylight saving skips, delays or runs twice.
+  entry: tzmeet cron --check
+  language: node
+  additional_dependencies: ["tzmeet@0.4.0"]
+  files: (?i)((^|/)(crontab|jenkinsfile)|\.(crontab|cron|timer|ya?ml|tf|json|jenkinsfile))$

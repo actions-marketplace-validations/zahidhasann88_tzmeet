@@ -22,7 +22,12 @@ import {
   formatCron,
   formatNatural,
 } from "./cron.js";
-import { checkCronFiles, formatCheck } from "./check.js";
+import {
+  checkCronFiles,
+  checkFormats,
+  formatCheck,
+  type CheckFormat,
+} from "./check.js";
 import { formatRecurring } from "./recurring.js";
 import { applyBusy } from "./busy.js";
 
@@ -248,7 +253,7 @@ No slots found is a successful search (exit 0); invalid input exits 1.
       "treat the arguments as files/folders: check crontabs, Kubernetes CronJobs, GitHub workflows, systemd timers, Jenkinsfiles and EventBridge schedules for DST problems",
     )
     .option("--strict", "with --check: also fail on warnings")
-    .option("--format <format>", "with --check: text or github (annotations)")
+    .option("--format <format>", "with --check: text, github (annotations), gitlab (Code Quality JSON) or sarif")
     .addHelpText(
       "after",
       `
@@ -290,13 +295,10 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
         const from =
           options.from ?? (context.now?.() ?? new Date()).toISOString();
         if (options.check) {
-          if (
-            options.format !== undefined &&
-            options.format !== "text" &&
-            options.format !== "github"
-          )
+          const format = (options.format ?? "text") as CheckFormat;
+          if (!checkFormats.includes(format))
             throw new Error(
-              `--format must be text or github, received ${JSON.stringify(options.format)}`,
+              `--format must be text, github, gitlab or sarif, received ${JSON.stringify(options.format)}`,
             );
           const result = checkCronFiles(parts, {
             cwd: context.cwd ?? process.cwd(),
@@ -307,10 +309,7 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
           writeOut(
             json
               ? `${JSON.stringify(result, null, 2)}\n`
-              : formatCheck(
-                  result,
-                  options.format === "github" ? "github" : "text",
-                ),
+              : formatCheck(result, format, program.version()),
           );
           const failing = result.findings.filter(
             (finding) => finding.severity === "error" || options.strict,

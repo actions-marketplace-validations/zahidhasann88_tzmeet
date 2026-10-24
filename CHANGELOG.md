@@ -8,6 +8,9 @@ Notable changes are recorded here. Package versions follow semantic versioning.
 
 - More cron syntaxes in the explainer, converters, plain-English parser and `--check`: AWS EventBridge `cron(...)` (Quartz-style `?`, `L`, `W`, `#`, year field), GitHub Actions `schedule:` (POSIX fields, `timezone:` or UTC), Jenkins (`H`, `H(0-29)`, `@midnight`, `TZ=` line) and systemd `OnCalendar=` (weekdays, `..` ranges, repetition, shorthands like `weekly`, trailing time zone). Detected automatically, or set with `dialect`. Each engine's DST behaviour was checked against its docs or source: EventBridge skips the missing hour and runs once in the repeated one, GitHub Actions runs the missing hour's job right after the change, Jenkins skips the missing hour and runs twice in the repeated one, systemd skips the missing hour. Where an engine doesn't document the repeated hour, a `dst-maybe-double` warning says it may run twice. Jenkins `H` gets a `jenkins-hash` note.
 - `tzmeet cron --check` also scans GitHub Actions workflows, systemd `*.timer` files, Jenkinsfiles and EventBridge schedules in CloudFormation, SAM, Serverless and Terraform files. With `--zone`, UTC-only GitHub and EventBridge schedules get a `utc-shift` warning when their local time moves with DST.
+- `tzmeet cron --check --format gitlab` writes a GitLab Code Quality report and `--format sarif` writes SARIF 2.1.0 for GitHub code scanning.
+- pre-commit hook `tzmeet-cron-check` (`.pre-commit-hooks.yaml`) that checks the schedule files in each commit.
+- GitLab CI template (`templates/tzmeet-cron-check.gitlab-ci.yml`) that fails the pipeline on DST problems and shows them in merge requests.
 - Native time-zone snippets for the new engines in `convertCronZone` (`ScheduleExpressionTimezone`, `timezone:`, `TZ=`, `OnCalendar=… zone`).
 
 ## [0.4.0] - 2026-10-23
