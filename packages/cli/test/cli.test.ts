@@ -1284,6 +1284,124 @@ describe("cron --check", () => {
     ).toEqual(["dst-double", "dst-skip", "k8s-no-timezone", "dom-dow-or"]);
   });
 
+  it("checks GitHub workflows, systemd timers, Jenkinsfiles and EventBridge schedules", () => {
+    mkdirSync(join(cwd, ".github", "workflows"), { recursive: true });
+    writeFileSync(
+      join(cwd, ".github", "workflows", "nightly.yml"),
+      [
+        "name: nightly",
+        "on:",
+        "  schedule:",
+        '    - cron: "30 2 * * *"',
+        '      timezone: "America/New_York"',
+        '    - cron: "0 9 * * 1-5"',
+        "jobs: {}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "backup.timer"),
+      "[Timer]\nOnCalendar=*-*-* 01:30:00 Europe/London\nPersistent=true\n",
+    );
+    writeFileSync(
+      join(cwd, "Jenkinsfile"),
+      [
+        "pipeline {",
+        "  triggers {",
+        "    cron('''TZ=Europe/London",
+        "H 1 * * *''')",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "template.yaml"),
+      [
+        "Resources:",
+        "  Nightly:",
+        "    Type: AWS::Scheduler::Schedule",
+        "    Properties:",
+        '      ScheduleExpression: "cron(30 2 * * ? *)"',
+        "      ScheduleExpressionTimezone: America/New_York",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(cwd, "main.tf"),
+      'resource "aws_scheduler_schedule" "x" {\n  schedule_expression = "cron(0 9 ? * MON-FRI *)"\n}\n',
+    );
+    writeFileSync(join(cwd, "package.json"), '{"name": "no-schedules"}\n');
+    const result = JSON.parse(
+      invoke([
+        "cron",
+        "--check",
+        ".",
+        "--json",
+        "--zone",
+        "Europe/London",
+        ...from,
+      ]).stdout,
+    );
+    expect(result).toMatchObject({ files: 5, schedules: 6 });
+    const found = result.findings.map(
+      (finding: { file: string; line: number; code: string }) =>
+        `${finding.file}:${finding.line} ${finding.code}`,
+    );
+    expect(found).toEqual(
+      expect.arrayContaining([
+        ".github/workflows/nightly.yml:4 dst-late",
+        ".github/workflows/nightly.yml:6 utc-shift",
+        "backup.timer:2 dst-skip",
+        "backup.timer:2 dst-maybe-double",
+        "Jenkinsfile:4 dst-double",
+        "template.yaml:5 dst-skip",
+        "main.tf:2 utc-shift",
+      ]),
+    );
+    expect(
+      result.findings.find(
+        (finding: { code: string }) => finding.code === "utc-shift",
+      ).message,
+    ).toContain("Runs in UTC, so its local time moves with daylight saving.");
+  });
+
+  it("writes GitLab Code Quality and SARIF reports", () => {
+    setup();
+    const gitlab = invoke(["cron", "--check", "k8s", "--format", "gitlab", ...from]);
+    expect(gitlab.code).toBe(1);
+    const issues = JSON.parse(gitlab.stdout) as {
+      check_name: string;
+      severity: string;
+      fingerprint: string;
+      location: { path: string; lines: { begin: number } };
+    }[];
+    expect(issues.map((issue) => [issue.check_name, issue.severity, issue.location.path, issue.location.lines.begin])).toEqual([
+      ["dst-double", "critical", "k8s/jobs.yaml", 6],
+      ["dst-skip", "critical", "k8s/jobs.yaml", 6],
+      ["k8s-no-timezone", "minor", "k8s/jobs.yaml", 15],
+      ["dom-dow-or", "minor", "k8s/jobs.yaml", 15],
+    ]);
+    expect(new Set(issues.map((issue) => issue.fingerprint)).size).toBe(4);
+    expect(JSON.parse(invoke(["cron", "--check", "k8s", "--format", "gitlab", ...from]).stdout)).toEqual(issues);
+
+    const sarif = JSON.parse(invoke(["cron", "--check", "k8s", "--format", "sarif", ...from]).stdout);
+    expect(sarif.version).toBe("2.1.0");
+    const run = sarif.runs[0];
+    expect(run.tool.driver).toMatchObject({ name: "tzmeet", version: "0.5.0" });
+    expect(run.tool.driver.rules.map((rule: { id: string }) => rule.id)).toEqual(["dom-dow-or", "dst-double", "dst-skip", "k8s-no-timezone"]);
+    expect(run.results[0]).toMatchObject({
+      ruleId: "dst-double",
+      ruleIndex: 1,
+      level: "error",
+      locations: [{ physicalLocation: { artifactLocation: { uri: "k8s/jobs.yaml" }, region: { startLine: 6 } } }],
+    });
+    expect(run.results[0].message.text).toContain("[30 1 * * * in Europe/London]");
+
+    writeFileSync(join(cwd, "ok.crontab"), "0 9 * * * /bin/true\n");
+    expect(invoke(["cron", "--check", "ok.crontab", "--format", "gitlab", ...from])).toMatchObject({ code: 0, stdout: "[]\n" });
+  });
+
   it("reports bad lines, bad zones and missing paths", () => {
     writeFileSync(
       join(cwd, "bad.crontab"),
@@ -1303,7 +1421,7 @@ describe("cron --check", () => {
     expect(missing.stderr).toContain("Cannot read nowhere");
     expect(
       invoke(["cron", "--check", ".", "--format", "xml"]).stderr,
-    ).toContain("--format must be text or github");
+    ).toContain("--format must be text, github, gitlab or sarif");
   });
 });
 

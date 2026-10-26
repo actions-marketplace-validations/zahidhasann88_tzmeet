@@ -72,8 +72,9 @@ Quote the expression so your shell doesn't expand `*`.
 # Explain a schedule: plain English, next runs, DST warnings
 tzmeet cron "30 2 * * *" --zone America/New_York
 
-# Convert between Unix, Kubernetes, Spring and Quartz syntax
+# Convert between Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins and systemd syntax
 tzmeet cron "0 9 * * 1-5" --to quartz          # 0 0 9 ? * MON-FRI
+tzmeet cron "0 9 * * 1-5" --to systemd         # Mon..Fri *-*-* 09:00:00
 
 # "I want 09:00 Dhaka, but the server runs in UTC"
 tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
@@ -82,7 +83,7 @@ tzmeet cron "0 9 * * *" --zone Asia/Dhaka --to-zone UTC
 tzmeet cron "every weekday at 9am Dhaka" --to kubernetes
 ```
 
-When daylight saving changes the gap between the zones, `--to-zone` lists one expression per period and recommends setting the scheduler's own time zone instead (`CRON_TZ`, `spec.timeZone`, `@Scheduled(zone)`, Quartz `inTimeZone`).
+When daylight saving changes the gap between the zones, `--to-zone` lists one expression per period and recommends setting the scheduler's own time zone instead (`CRON_TZ`, `spec.timeZone`, `@Scheduled(zone)`, Quartz `inTimeZone`, `ScheduleExpressionTimezone`, GitHub `timezone:`, Jenkins `TZ=`, or a zone at the end of `OnCalendar=`).
 
 ### Check schedules in CI
 
@@ -90,16 +91,54 @@ When daylight saving changes the gap between the zones, `--to-zone` lists one ex
 tzmeet cron --check . --zone America/New_York
 ```
 
-Scans crontabs (`crontab`, `*.crontab`, `*.cron`, honouring `CRON_TZ=` lines) and Kubernetes CronJob YAML (`*.yaml`, `*.yml`). It exits with 1 when a run would be skipped, delayed or doubled by a clock change, or a schedule is invalid. Warnings (a CronJob without `spec.timeZone`, day-of-month and day-of-week both set) fail only with `--strict`. `--zone` is used where a file sets no time zone. Use `--format github` for pull-request annotations, or `--json`.
+Scans crontabs (`crontab`, `*.crontab`, `*.cron`, honouring `CRON_TZ=` lines), Kubernetes CronJobs and GitHub Actions workflows (`on.schedule`, with `timezone:` or UTC) in `*.yaml`/`*.yml`, systemd `*.timer` files (`OnCalendar=`), Jenkinsfiles (`cron('…')`, honouring a `TZ=` line) and EventBridge `cron(...)` schedules in CloudFormation, SAM, Serverless (YAML/JSON) or Terraform files (with a nearby `ScheduleExpressionTimezone`/`schedule_expression_timezone`, otherwise UTC). It exits with 1 when a run would be skipped, delayed or doubled by a clock change, or a schedule is invalid. Warnings (a CronJob without `spec.timeZone`, day-of-month and day-of-week both set, a repeated hour where the engine doesn't document what it does, a UTC-only schedule whose local time moves with DST in the `--zone` you give) fail only with `--strict`. `--zone` is used where a file sets no time zone.
 
-As a GitHub Action:
+Output formats (`--format`): `text` (default), `github` (pull-request annotations), `gitlab` (a Code Quality report) and `sarif` (GitHub code scanning and other SARIF viewers). `--json` prints the raw findings.
+
+Run it wherever you check code:
+
+**GitHub Action**
 
 ```yaml
-- uses: zahidhasann88/tzmeet@v0.4.0
+- uses: zahidhasann88/tzmeet@v0.5.0
   with:
     paths: k8s/ deploy/crontab
     zone: America/New_York   # where no time zone is set
     strict: true             # also fail on warnings
+```
+
+**GitHub code scanning** (findings appear under Security → Code scanning)
+
+```yaml
+- run: npx --yes tzmeet cron --check . --format sarif > tzmeet.sarif || true
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: tzmeet.sarif
+```
+
+**pre-commit** (checks the crontab, YAML, timer, Jenkinsfile, JSON and Terraform files in each commit)
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/zahidhasann88/tzmeet
+    rev: v0.5.0
+    hooks:
+      - id: tzmeet-cron-check
+        args: [--zone, America/New_York]   # optional
+```
+
+**GitLab CI** (fails the pipeline and shows findings in merge requests)
+
+```yaml
+# .gitlab-ci.yml
+include:
+  - remote: https://raw.githubusercontent.com/zahidhasann88/tzmeet/v0.5.0/templates/tzmeet-cron-check.gitlab-ci.yml
+
+variables:
+  TZMEET_PATHS: k8s/ deploy/crontab   # default: .
+  TZMEET_ZONE: America/New_York       # default: UTC
+  TZMEET_STRICT: "true"               # also fail on warnings
 ```
 
 ## Config file

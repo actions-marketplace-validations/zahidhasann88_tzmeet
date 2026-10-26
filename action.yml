@@ -1,5 +1,5 @@
 name: tzmeet cron check
-description: Fail pull requests on cron schedules that daylight saving skips or runs twice (crontabs and Kubernetes CronJobs).
+description: Fail pull requests on cron schedules that daylight saving skips or runs twice (crontab, Kubernetes, CI, cloud).
 author: zahidhasann88
 branding:
   icon: clock
@@ -7,11 +7,11 @@ branding:
 
 inputs:
   paths:
-    description: Files or folders to scan, separated by spaces. Folders are searched for *.yaml, *.yml, crontab, *.crontab and *.cron files.
+    description: Files or folders to scan, separated by spaces. Folders are searched for *.yaml, *.yml, crontab, *.crontab, *.cron, *.timer, Jenkinsfile, and *.json/*.tf files containing cron(...).
     required: false
     default: .
   zone:
-    description: IANA time zone for crontabs without CRON_TZ and CronJobs without spec.timeZone.
+    description: IANA time zone for schedules that set none (crontabs without CRON_TZ, CronJobs without spec.timeZone, Jenkins without TZ=, systemd without a zone). Also shows how UTC-only GitHub and EventBridge schedules move in this zone.
     required: false
     default: UTC
   strict:
@@ -21,7 +21,7 @@ inputs:
   version:
     description: tzmeet version to run from npm.
     required: false
-    default: "0.4.0"
+    default: "0.5.0"
 
 runs:
   using: composite

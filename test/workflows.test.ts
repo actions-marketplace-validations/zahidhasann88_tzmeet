@@ -228,6 +228,8 @@ describe("API CI contracts", () => {
 
 describe("GitHub Action (action.yml)", () => {
   const action = parseDocument(readFileSync("action.yml", "utf8")).toJS() as {
+    name: string;
+    description: string;
     inputs: Record<string, { default: string }>;
     runs: {
       using: string;
@@ -237,6 +239,11 @@ describe("GitHub Action (action.yml)", () => {
   const cli = JSON.parse(readFileSync("packages/cli/package.json", "utf8")) as {
     version: string;
   };
+
+  it("meets the Marketplace listing rules", () => {
+    expect(action.description.length).toBeLessThan(125);
+    expect(action.name.length).toBeGreaterThan(0);
+  });
 
   it("runs the published CLI version that matches this release", () => {
     expect(action.runs.using).toBe("composite");
@@ -257,5 +264,79 @@ describe("GitHub Action (action.yml)", () => {
     ).toBe(true);
     expect(action.inputs.paths!.default).toBe(".");
     expect(action.inputs.zone!.default).toBe("UTC");
+  });
+});
+
+describe("pre-commit hook and GitLab CI template", () => {
+  const cli = JSON.parse(readFileSync("packages/cli/package.json", "utf8")) as {
+    version: string;
+  };
+  const hooks = parseDocument(
+    readFileSync(".pre-commit-hooks.yaml", "utf8"),
+  ).toJS() as {
+    id: string;
+    entry: string;
+    language: string;
+    additional_dependencies: string[];
+    files: string;
+  }[];
+  const gitlab = parseDocument(
+    readFileSync("templates/tzmeet-cron-check.gitlab-ci.yml", "utf8"),
+  ).toJS() as {
+    variables: Record<string, string>;
+    "tzmeet-cron-check": {
+      script: string[];
+      artifacts: { when: string; reports: { codequality: string } };
+    };
+  };
+
+  it("pins the CLI version of this release", () => {
+    expect(hooks[0]).toMatchObject({
+      id: "tzmeet-cron-check",
+      entry: "tzmeet cron --check",
+      language: "node",
+      additional_dependencies: [`tzmeet@${cli.version}`],
+    });
+    expect(gitlab.variables.TZMEET_VERSION).toBe(cli.version);
+    expect(readFileSync("packages/cli/README.md", "utf8")).toContain(
+      `v${cli.version}`,
+    );
+  });
+
+  it("passes the hook only the files --check can read", () => {
+    const pattern = new RegExp(hooks[0]!.files.replace(/^\(\?i\)/, ""), "i");
+    for (const file of [
+      "crontab",
+      "ops/backup.crontab",
+      "jobs.cron",
+      "backup.timer",
+      "Jenkinsfile",
+      "ci/deploy.jenkinsfile",
+      ".github/workflows/nightly.yml",
+      "k8s/jobs.yaml",
+      "infra/main.tf",
+      "template.json",
+    ])
+      expect(file).toMatch(pattern);
+    for (const file of [
+      "README.md",
+      "src/crontab.ts",
+      "Jenkinsfile.bak",
+      "notes.txt",
+    ])
+      expect(file).not.toMatch(pattern);
+  });
+
+  it("writes a Code Quality report and keeps the exit code of the check", () => {
+    const job = gitlab["tzmeet-cron-check"];
+    expect(job.script[1]).toContain("--format gitlab");
+    expect(job.script[1]).toContain(
+      "> gl-code-quality-report.json && status=0 || status=$?",
+    );
+    expect(job.script.at(-1)).toBe("exit $status");
+    expect(job.artifacts).toEqual({
+      when: "always",
+      reports: { codequality: "gl-code-quality-report.json" },
+    });
   });
 });

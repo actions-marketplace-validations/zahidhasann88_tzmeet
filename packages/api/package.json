@@ -1,6 +1,6 @@
 {
   "name": "@tzmeet/api",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Stateless, portable REST transport for tzmeet core",
   "type": "module",
   "license": "MIT",

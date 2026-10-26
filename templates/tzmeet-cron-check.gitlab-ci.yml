@@ -1,0 +1,18 @@
+variables:
+  TZMEET_PATHS: "."
+  TZMEET_ZONE: "UTC"
+  TZMEET_STRICT: "false"
+  TZMEET_VERSION: "0.5.0"
+
+tzmeet-cron-check:
+  stage: test
+  image: node:22-alpine
+  script:
+    - strict=""; if [ "$TZMEET_STRICT" = "true" ]; then strict="--strict"; fi
+    - npx --yes "tzmeet@${TZMEET_VERSION}" cron --check $TZMEET_PATHS --zone "$TZMEET_ZONE" --format gitlab $strict > gl-code-quality-report.json && status=0 || status=$?
+    - npx --yes "tzmeet@${TZMEET_VERSION}" cron --check $TZMEET_PATHS --zone "$TZMEET_ZONE" $strict || true
+    - exit $status
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json

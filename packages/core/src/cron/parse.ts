@@ -1,9 +1,23 @@
-export type CronDialect = "unix" | "kubernetes" | "spring" | "quartz";
+import { systemdToFields } from "./systemd.js";
+
+export type CronDialect =
+  | "unix"
+  | "kubernetes"
+  | "spring"
+  | "quartz"
+  | "eventbridge"
+  | "github"
+  | "jenkins"
+  | "systemd";
 export const cronDialects: readonly CronDialect[] = [
   "unix",
   "kubernetes",
   "spring",
   "quartz",
+  "eventbridge",
+  "github",
+  "jenkins",
+  "systemd",
 ];
 
 export type CronFieldName =
@@ -52,6 +66,7 @@ export interface ParsedCron {
   year?: CronField;
   dayMatch: "and" | "or";
   fixedTime: boolean;
+  hashed?: CronFieldName[];
 }
 
 export type CronParseResult =
@@ -95,17 +110,38 @@ const fieldCounts: Record<CronDialect, number[]> = {
   kubernetes: [5],
   spring: [6],
   quartz: [6, 7],
+  eventbridge: [6],
+  github: [5],
+  jenkins: [5],
+  systemd: [7],
 };
 const dialectNames: Record<CronDialect, string> = {
   unix: "Unix cron",
   kubernetes: "Kubernetes CronJob",
   spring: "Spring",
   quartz: "Quartz",
+  eventbridge: "AWS EventBridge",
+  github: "GitHub Actions",
+  jenkins: "Jenkins",
+  systemd: "systemd timer",
+};
+const hasSpecials = (dialect: CronDialect) =>
+  dialect === "spring" || dialect === "quartz" || dialect === "eventbridge";
+const sundayFirst = (dialect: CronDialect) =>
+  dialect === "quartz" || dialect === "eventbridge";
+const jenkinsMacros: Record<string, string> = {
+  "@yearly": "H H H H *",
+  "@annually": "H H H H *",
+  "@monthly": "H H H * *",
+  "@weekly": "H H * * H",
+  "@daily": "H H * * *",
+  "@midnight": "H H(0-2) * * *",
+  "@hourly": "H * * * *",
 };
 export const cronDialectName = (dialect: CronDialect) => dialectNames[dialect];
 
 function rules(dialect: CronDialect): Record<CronFieldName, FieldRule> {
-  const quartz = dialect === "quartz";
+  const quartz = sundayFirst(dialect);
   return {
     second: { name: "second", min: 0, max: 59 },
     minute: { name: "minute", min: 0, max: 59 },
@@ -115,18 +151,25 @@ function rules(dialect: CronDialect): Record<CronFieldName, FieldRule> {
     dayOfWeek: quartz
       ? { name: "dayOfWeek", min: 1, max: 7, names: dayNames, namesFrom: 1 }
       : { name: "dayOfWeek", min: 0, max: 7, names: dayNames, namesFrom: 0 },
-    year: { name: "year", min: 1970, max: 2099 },
+    year: { name: "year", min: 1970, max: dialect === "quartz" ? 2099 : 2199 },
   };
 }
 
 export function isoWeekday(dialect: CronDialect, value: number): number {
-  if (dialect === "quartz") return ((value + 5) % 7) + 1;
+  if (sundayFirst(dialect)) return ((value + 5) % 7) + 1;
   return value % 7 === 0 ? 7 : value;
 }
 
 export function detectDialect(expression: string): CronDialect {
   const text = expression.trim();
-  if (/^(?:CRON_)?TZ=/i.test(text)) return "kubernetes";
+  if (/^cron\(/i.test(text)) return "eventbridge";
+  const jenkins = /(?:^|\s)H(?:\(|\/|\s|$)/.test(
+    text.replace(/^TZ=\S+\s+/, " "),
+  );
+  if (/^(?:CRON_)?TZ=/i.test(text)) return jenkins ? "jenkins" : "kubernetes";
+  if (jenkins) return "jenkins";
+  if (/\d{1,2}:\d{2}|\.\.|\*-\*|^\d{4}-\d{2}-\d{2}/.test(text))
+    return "systemd";
   if (text.startsWith("@")) return "unix";
   const fields = text.split(/\s+/);
   if (fields.length === 7) return "quartz";
@@ -178,7 +221,7 @@ function parsePart(
   rule: FieldRule,
   token: string,
 ): CronPart {
-  const specials = dialect === "spring" || dialect === "quartz";
+  const specials = hasSpecials(dialect);
   const upper = token.toUpperCase();
   if (rule.name === "dayOfMonth" && specials) {
     if (upper === "L") return { kind: "last", offset: 0 };
@@ -195,7 +238,7 @@ function parsePart(
       return { kind: "nearestWeekday", day: parseValue(rule, weekday[1]!) };
   }
   if (rule.name === "dayOfWeek" && specials) {
-    if (upper === "L" && dialect === "quartz")
+    if (upper === "L" && sundayFirst(dialect))
       return { kind: "range", from: 7, to: 7, step: 1 };
     const last = /^(\w+)L$/.exec(upper);
     if (last)
@@ -314,10 +357,22 @@ export function parseCron(
   if (text.length > 200)
     return fail("Expression must be at most 200 characters");
 
+  if (dialect === "eventbridge") {
+    const wrapped = /^cron\((.*)\)$/i.exec(text);
+    if (wrapped) text = wrapped[1]!.trim();
+    else if (/^(?:rate|at)\(/i.test(text))
+      return fail(
+        `${text.split("(")[0]}() schedules aren't cron, so they aren't explained here`,
+      );
+  }
   let prefixZone: string | undefined;
   const prefix = /^(?:CRON_)?TZ=(\S+)\s+/i.exec(text);
   if (prefix) {
-    if (dialect !== "kubernetes")
+    if (dialect === "jenkins" && /^CRON_/i.test(prefix[0]))
+      return fail(
+        'Jenkins sets the time zone with a "TZ=" first line, not CRON_TZ=',
+      );
+    if (dialect !== "kubernetes" && dialect !== "jenkins")
       return fail(
         `${dialectNames[dialect]} doesn't accept a CRON_TZ=/TZ= prefix in the expression`,
       );
@@ -328,8 +383,15 @@ export function parseCron(
   let macro: string | undefined;
   if (text.startsWith("@")) {
     macro = text.toLowerCase();
-    if (dialect === "quartz")
-      return fail("Quartz doesn't support @ shortcuts like @daily");
+    if (
+      dialect === "quartz" ||
+      dialect === "eventbridge" ||
+      dialect === "github" ||
+      dialect === "systemd"
+    )
+      return fail(
+        `${dialectNames[dialect]} doesn't support @ shortcuts like @daily`,
+      );
     if (macro === "@reboot")
       return fail(
         "@reboot runs once at startup, so it has no schedule to explain",
@@ -338,48 +400,83 @@ export function parseCron(
       return fail(
         "@every is a fixed interval, not a clock schedule, so DST doesn't affect it",
       );
-    const expanded = macros[macro];
+    const expanded =
+      dialect === "jenkins" ? jenkinsMacros[macro] : macros[macro];
     if (!expanded) return fail(`Unknown shortcut "${text}"`);
     text = dialect === "spring" ? `0 ${expanded}` : expanded;
   }
 
-  const fields = text.split(/\s+/);
+  let fields = text.split(/\s+/);
+  if (dialect === "systemd") {
+    const translated = systemdToFields(text);
+    if ("error" in translated) return fail(translated.error);
+    fields = translated.fields;
+    if (translated.zone) prefixZone = translated.zone;
+  }
+
+  const hashed: CronFieldName[] = [];
   const counts = fieldCounts[dialect];
   if (!counts.includes(fields.length)) {
     const expected = dialect === "quartz" ? "6 or 7" : String(counts[0]);
     const order =
-      dialect === "unix" || dialect === "kubernetes"
-        ? "minute hour day-of-month month day-of-week"
-        : `second minute hour day-of-month month day-of-week${dialect === "quartz" ? " [year]" : ""}`;
+      dialect === "eventbridge"
+        ? "minute hour day-of-month month day-of-week year"
+        : fieldCounts[dialect][0] === 5
+          ? "minute hour day-of-month month day-of-week"
+          : `second minute hour day-of-month month day-of-week${dialect === "quartz" ? " [year]" : ""}`;
     return fail(
       `${dialectNames[dialect]} expects ${expected} fields (${order}), got ${fields.length}`,
     );
   }
 
   const names: CronFieldName[] =
-    fields.length === 5
-      ? ["minute", "hour", "dayOfMonth", "month", "dayOfWeek"]
-      : ([
-          "second",
-          "minute",
-          "hour",
-          "dayOfMonth",
-          "month",
-          "dayOfWeek",
-          "year",
-        ].slice(0, fields.length) as CronFieldName[]);
+    dialect === "eventbridge"
+      ? ["minute", "hour", "dayOfMonth", "month", "dayOfWeek", "year"]
+      : fields.length === 5
+        ? ["minute", "hour", "dayOfMonth", "month", "dayOfWeek"]
+        : ([
+            "second",
+            "minute",
+            "hour",
+            "dayOfMonth",
+            "month",
+            "dayOfWeek",
+            "year",
+          ].slice(0, fields.length) as CronFieldName[]);
   const fieldRules = rules(dialect);
   const parsed: Partial<Record<CronFieldName, CronField>> = {};
   names.forEach((name, index) => {
-    const raw = fields[index]!;
+    let raw = fields[index]!;
+    if (dialect === "jenkins" && /H/.test(raw)) {
+      const rule = fieldRules[name];
+      raw = raw
+        .split(",")
+        .map((token) => {
+          const match = /^H(?:\((\d+)-(\d+)\))?(?:\/(\d+))?$/.exec(token);
+          if (!match) return token;
+          const [from, to] = match[1]
+            ? [match[1], match[2]!]
+            : [String(rule.min), String(rule.max)];
+          return match[3] ? `${from}-${to}/${match[3]}` : from;
+        })
+        .join(",");
+      fields[index] = raw;
+      hashed.push(name);
+    }
     try {
       if (raw.includes("?") && name !== "dayOfMonth" && name !== "dayOfWeek")
         throw new FieldError(
           `"?" is only allowed in day-of-month or day-of-week`,
           raw,
         );
-      if (raw.includes("?") && dialect === "unix")
-        throw new FieldError(`Unix cron doesn't support "?"; use "*"`, raw);
+      if (
+        raw.includes("?") &&
+        (dialect === "unix" || dialect === "github" || dialect === "jenkins")
+      )
+        throw new FieldError(
+          `${dialectNames[dialect]} doesn't support "?"; use "*"`,
+          raw,
+        );
       parsed[name] = parseField(dialect, fieldRules[name], raw);
     } catch (error) {
       if (!(error instanceof FieldError)) throw error;
@@ -389,13 +486,15 @@ export function parseCron(
 
   const domText = fields[names.indexOf("dayOfMonth")]!;
   const dowText = fields[names.indexOf("dayOfWeek")]!;
-  if (dialect === "quartz" && (domText === "?") === (dowText === "?"))
+  if (sundayFirst(dialect) && (domText === "?") === (dowText === "?"))
     errors.push({
       field: domText === "?" ? "dayOfWeek" : "dayOfMonth",
       message:
         domText === "?"
-          ? `Quartz allows "?" in only one of day-of-month and day-of-week`
-          : `Quartz needs "?" in either day-of-month or day-of-week, e.g. "0 0 12 ? * MON" or "0 0 12 15 * ?"`,
+          ? `${dialectNames[dialect]} allows "?" in only one of day-of-month and day-of-week`
+          : dialect === "eventbridge"
+            ? `AWS EventBridge needs "?" in either day-of-month or day-of-week, e.g. "cron(0 9 ? * MON-FRI *)"`
+            : `Quartz needs "?" in either day-of-month or day-of-week, e.g. "0 0 12 ? * MON" or "0 0 12 15 * ?"`,
     });
   if (errors.length) return { ok: false, dialect, errors };
 
@@ -403,7 +502,8 @@ export function parseCron(
   const robfigStar = (field: CronField) =>
     field.parts.some((part) => part.kind === "any" && part.step === 1);
   let dayMatch: "and" | "or" = "and";
-  if (dialect === "unix")
+
+  if (dialect === "unix" || dialect === "github")
     dayMatch = starts(domText) || starts(dowText) ? "and" : "or";
   if (dialect === "kubernetes")
     dayMatch =
@@ -429,6 +529,7 @@ export function parseCron(
       ...(parsed.year ? { year: parsed.year } : {}),
       dayMatch,
       fixedTime: dialect === "unix" && !starts(minuteText) && !starts(hourText),
+      ...(hashed.length ? { hashed } : {}),
     },
   };
 }

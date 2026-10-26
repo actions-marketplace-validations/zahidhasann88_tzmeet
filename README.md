@@ -65,14 +65,18 @@ See the [library guide](packages/core/README.md).
 
 ### 5. "My hours" link
 
-Make a link with your working hours at **[zahidhasann88.github.io/tzmeet/#/me](https://zahidhasann88.github.io/tzmeet/#/me)** and put it in your email signature. Whoever opens it sees whether you're working now and your hours for the week, in their own time zone.
+Make a link with your working hours at **[zahidhasann88.github.io/tzmeet/#/me](https://zahidhasann88.github.io/tzmeet/#/me)** and put it in your email signature. Whoever opens it sees whether you're working now and your hours for the week, in their own time zone. You can also copy a small status badge (working, off, weekend or holiday) for a README or website, linked to your hours.
 
-### 6. Cron schedules
+### 6. Team hours link
 
-tzmeet also explains cron schedules (Unix, Kubernetes, Spring, Quartz, or plain English like "every weekday at 9am Dhaka"), converts them between syntaxes and time zones, and checks them for daylight saving problems: in the [web app](https://zahidhasann88.github.io/tzmeet/cron/), with `npx tzmeet cron`, or in CI with the GitHub Action:
+Add your team at **[zahidhasann88.github.io/tzmeet/#/team](https://zahidhasann88.github.io/tzmeet/#/team)** (or paste each person's "My hours" link) and share one link. Whoever opens it sees who's working now, when everyone's hours overlap this week, and a 7-day grid in their own time zone. "Find a meeting time" opens the meeting finder with the whole team filled in.
+
+### 7. Cron schedules
+
+tzmeet also explains cron schedules (Unix, Kubernetes, Spring, Quartz, AWS EventBridge, GitHub Actions, Jenkins, systemd timers, or plain English like "every weekday at 9am Dhaka"), converts them between syntaxes and time zones, and checks them for daylight saving problems: in the [web app](https://zahidhasann88.github.io/tzmeet/cron/), with `npx tzmeet cron`, or in CI with the GitHub Action, a [pre-commit hook or a GitLab CI template](packages/cli/README.md#check-schedules-in-ci):
 
 ```yaml
-- uses: zahidhasann88/tzmeet@v0.4.0
+- uses: zahidhasann88/tzmeet@v0.5.0
   with:
     paths: k8s/
 ```
@@ -91,7 +95,7 @@ You can change all of these for each city.
 ## Good to know
 
 - Prayer times are calculated and approximate. Check your local mosque timetable.
-- Public holidays can be switched on per city for Bangladesh, India, Pakistan, the UAE, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date.
+- Public holidays can be switched on per city for Bangladesh, India, Pakistan, the UAE, the UK (England and Wales) and the US. Islamic holidays are approximate (they depend on moon sighting), and other holidays can be added by date. Each country's holidays can also be downloaded as a calendar file or subscribed to in Google, Apple or Outlook calendar.
 - Each city can have different hours for a date range, such as shorter Ramadan office hours (Ramadan dates are calculated and approximate).
 - For recurring meetings, tzmeet can suggest 2 or 3 times to alternate week by week, so no city always gets the early or late slot.
 - Mark a city's attendees as optional: they never block a time, but times they can attend rank higher.

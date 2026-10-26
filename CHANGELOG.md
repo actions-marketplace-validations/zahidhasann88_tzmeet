@@ -2,6 +2,25 @@
 
 Notable changes are recorded here. Package versions follow semantic versioning.
 
+## [0.5.0] - 2026-10-25
+
+### Added
+
+- More cron syntaxes in the explainer, converters, plain-English parser and `--check`: AWS EventBridge `cron(...)` (Quartz-style `?`, `L`, `W`, `#`, year field), GitHub Actions `schedule:` (POSIX fields, `timezone:` or UTC), Jenkins (`H`, `H(0-29)`, `@midnight`, `TZ=` line) and systemd `OnCalendar=` (weekdays, `..` ranges, repetition, shorthands like `weekly`, trailing time zone). Detected automatically, or set with `dialect`. Each engine's DST behaviour was checked against its docs or source: EventBridge skips the missing hour and runs once in the repeated one, GitHub Actions runs the missing hour's job right after the change, Jenkins skips the missing hour and runs twice in the repeated one, systemd skips the missing hour. Where an engine doesn't document the repeated hour, a `dst-maybe-double` warning says it may run twice. Jenkins `H` gets a `jenkins-hash` note.
+- `tzmeet cron --check` also scans GitHub Actions workflows, systemd `*.timer` files, Jenkinsfiles and EventBridge schedules in CloudFormation, SAM, Serverless and Terraform files. With `--zone`, UTC-only GitHub and EventBridge schedules get a `utc-shift` warning when their local time moves with DST.
+- `tzmeet cron --check --format gitlab` writes a GitLab Code Quality report and `--format sarif` writes SARIF 2.1.0 for GitHub code scanning.
+- pre-commit hook `tzmeet-cron-check` (`.pre-commit-hooks.yaml`) that checks the schedule files in each commit.
+- GitLab CI template (`templates/tzmeet-cron-check.gitlab-ci.yml`) that fails the pipeline on DST problems and shows them in merge requests.
+- Native time-zone snippets for the new engines in `convertCronZone` (`ScheduleExpressionTimezone`, `timezone:`, `TZ=`, `OnCalendar=… zone`).
+- Team hours page (`#/team`, shared through a `/team/` page with its own link preview): one link with up to 12 people, each with their own zone, work hours, weekend and public holidays. Shows who's working now, the longest stretches this week when everyone (or the most people) works, and a 7-day grid shaded by how many people are working, in the viewer's time zone. People can be added from their My hours links. "Find a meeting time" opens the meeting finder with the team; people in the same zone become one city with the hours they share.
+- Holiday calendars: `GET /v1/holidays?preset=BD&year=2027` (JSON) and `GET /v1/holidays.ics?preset=BD`, a feed for this year and next that calendar apps can subscribe to (all-day events marked free, approximate dates labelled, stable UIDs, daily refresh hint, `ETag` and caching). In the web app, every holiday preset has "Download holidays (.ics)", made in the browser, and "Subscribe in your calendar" links for Google Calendar, Apple Calendar and Outlook; shared My hours pages offer them for that person's country. Also `holidayCalendarText` in `@tzmeet/core`.
+- Status badge: `GET /v1/badge.svg` with the same parameters as a My hours link shows whether someone is working now, off, on their weekend or on a holiday (named), cached for 5 minutes with stale copies allowed while the API wakes up. The My hours builder previews the badge in the browser and copies it as Markdown or HTML linked to the hours page. Also `availabilityNow` and `badgeSvg` in `@tzmeet/core`.
+
+### Changed
+
+- On phones, the site's tool menu (Meetings, Cron, My hours, Team) gets its own row under the logo.
+- On wide screens, the meeting finder's and cron page's settings stay in view while the results scroll (with their own scrollbar when taller than the screen, shown only while scrolling), and the My hours and Team builders keep the live preview in view while you edit.
+
 ## [0.4.0] - 2026-10-23
 
 ### Added

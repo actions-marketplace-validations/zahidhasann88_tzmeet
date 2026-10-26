@@ -4,6 +4,7 @@ import {
   convertCronZone,
   parseNaturalCron,
   findSlots,
+  parseIcsBusy,
   parseScheduleInput,
   recurringImpact,
   type FindSlotsInput,
@@ -17,6 +18,7 @@ import {
   errorSchema,
   recurringResultSchema,
   healthSchema,
+  holidaysResultSchema,
   slotsResultSchema,
 } from "../src/schemas.js";
 
@@ -1045,5 +1047,167 @@ describe("recurring series as .ics over HTTP", () => {
     expect(text).toContain(
       `DTSTAMP:${clock().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
     );
+  });
+});
+
+describe("holiday calendars", () => {
+  it("lists a preset's holidays for a year, with approximate dates and notes", async () => {
+    const response = await app.request("/v1/holidays?preset=BD&year=2027");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=86400");
+    const body = holidaysResultSchema.parse(await response.json());
+    expect(body).toMatchObject({
+      preset: "BD",
+      name: "Bangladesh",
+      year: 2027,
+    });
+    expect(body.holidays).toContainEqual({
+      date: "2027-12-16",
+      name: "Victory Day",
+      approximate: false,
+    });
+    expect(body.holidays.some((holiday) => holiday.approximate)).toBe(true);
+    expect(body.note).toContain("2027");
+    const current = holidaysResultSchema.parse(
+      await (await app.request("/v1/holidays?preset=US")).json(),
+    );
+    expect(current.year).toBe(2026);
+    expect(current.note).toBeNull();
+    expect(current.holidays).toContainEqual({
+      date: "2026-11-26",
+      name: "Thanksgiving Day",
+      approximate: false,
+    });
+  });
+
+  it("rejects unknown presets and years out of range", async () => {
+    expect(
+      (await publicError(await app.request("/v1/holidays?preset=XX"))).details,
+    ).toContainEqual(expect.objectContaining({ field: "preset" }));
+    expect(
+      (await publicError(await app.request("/v1/holidays?preset=BD&year=1999")))
+        .details,
+    ).toContainEqual(expect.objectContaining({ field: "year" }));
+    expect(
+      (await publicError(await app.request("/v1/holidays.ics"))).details,
+    ).toContainEqual(expect.objectContaining({ field: "preset" }));
+  });
+
+  it("serves a feed calendars can subscribe to, for this year and next", async () => {
+    const response = await app.request("/v1/holidays.ics?preset=BD");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe(
+      "text/calendar; charset=utf-8",
+    );
+    expect(response.headers.get("Content-Disposition")).toBe(
+      'inline; filename="tzmeet-holidays-BD.ics"',
+    );
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=21600");
+    const text = await response.text();
+    expect(text.startsWith("BEGIN:VCALENDAR\r\n")).toBe(true);
+    expect(text).toContain("X-WR-CALNAME:Public holidays: Bangladesh\r\n");
+    expect(text).toContain("REFRESH-INTERVAL;VALUE=DURATION:P1D\r\n");
+    expect(text).toContain(
+      "UID:BD-2026-12-16-victory-day@tzmeet.local\r\nDTSTAMP:20261014T000000Z\r\nDTSTART;VALUE=DATE:20261216\r\nDTEND;VALUE=DATE:20261217\r\nSUMMARY:Victory Day\r\n",
+    );
+    expect(text).toContain("DTSTART;VALUE=DATE:20271216\r\n");
+    expect(text).not.toContain("DTSTART;VALUE=DATE:2028");
+    expect(text).toMatch(/SUMMARY:[^\r]*\(approximate\)\r\n/);
+    expect(
+      text
+        .split("\r\n")
+        .every((line) => new TextEncoder().encode(line).length <= 75),
+    ).toBe(true);
+    const window = {
+      from: "2026-01-01T00:00:00Z",
+      to: "2028-01-01T00:00:00Z",
+      defaultZone: "Asia/Dhaka",
+    };
+    expect(parseIcsBusy(text, window).busy).toEqual([]);
+    const parsed = parseIcsBusy(
+      text.replaceAll("TRANSP:TRANSPARENT", "TRANSP:OPAQUE"),
+      window,
+    );
+    expect(parsed.events).toBe(text.split("BEGIN:VEVENT").length - 1);
+    expect(parsed.warnings).toEqual([]);
+    expect(parsed.busy).toContainEqual({
+      start: "2026-12-15T18:00:00.000Z",
+      end: "2026-12-16T18:00:00.000Z",
+    });
+  });
+
+  it("answers 304 when the feed hasn't changed", async () => {
+    const first = await app.request("/v1/holidays.ics?preset=GB-ENG");
+    const etag = first.headers.get("ETag")!;
+    expect(etag).toMatch(/^"GB-ENG-[0-9a-f]+"$/);
+    const again = await app.request("/v1/holidays.ics?preset=GB-ENG");
+    expect(again.headers.get("ETag")).toBe(etag);
+    const cached = await app.request("/v1/holidays.ics?preset=GB-ENG", {
+      headers: { "If-None-Match": etag },
+    });
+    expect(cached.status).toBe(304);
+    expect(await cached.text()).toBe("");
+    expect(
+      (
+        await app.request("/v1/holidays.ics?preset=GB-ENG", {
+          headers: { "If-None-Match": '"old"' },
+        })
+      ).status,
+    ).toBe(200);
+  });
+});
+
+describe("availability badge", () => {
+  const badge = (query: string) => app.request(`/v1/badge.svg?${query}`);
+
+  it("returns an SVG badge with short caching and a strict content policy", async () => {
+    const response = await badge(
+      "n=Zahid&z=Asia%2FDhaka&w=09:00-18:00&d=56&h=BD",
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe(
+      "image/svg+xml; charset=utf-8",
+    );
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, max-age=300, s-maxage=300, stale-while-revalidate=600, stale-if-error=86400",
+    );
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'unsafe-inline'",
+    );
+    const svg = await response.text();
+    expect(svg).toContain('aria-label="Zahid: off (Asia/Dhaka)"');
+  });
+
+  it("says working, weekend, and uses the city when there's no name", async () => {
+    expect(
+      await (await badge("n=Zahid&z=Asia%2FDhaka&w=09:00-19:00")).text(),
+    ).toContain('aria-label="Zahid: working (Asia/Dhaka)"');
+    expect(await (await badge("z=Asia%2FDhaka&d=3")).text()).toContain(
+      'aria-label="Dhaka: weekend (Asia/Dhaka)"',
+    );
+    expect(
+      await (await badge("z=America%2FNew_York&w=08:00-17:00")).text(),
+    ).toContain('aria-label="New York: working (America/New_York)"');
+  });
+
+  it("escapes names and rejects bad parameters", async () => {
+    const svg = await (
+      await badge(`z=UTC&n=${encodeURIComponent("<b>x</b>")}`)
+    ).text();
+    expect(svg).not.toContain("<b>");
+    expect(svg).toContain("&lt;b&gt;x&lt;/b&gt;");
+    for (const [query, field] of [
+      ["z=Mars%2FBase", "z"],
+      ["z=UTC&w=9-5", "w"],
+      ["z=UTC&w=09:00-09:00", "w"],
+      ["z=UTC&d=8", "d"],
+      ["z=UTC&h=XX", "h"],
+      [`z=UTC&n=${"a".repeat(41)}`, "n"],
+    ] as const) {
+      const error = await publicError(await badge(query));
+      expect(error.details?.map((detail) => detail.field).join(",")).toContain(
+        field,
+      );
+    }
   });
 });

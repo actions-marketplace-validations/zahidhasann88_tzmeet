@@ -73,6 +73,7 @@ const notes: Record<CronRunNote, string> = {
   "fold-once": "Clocks repeat this time; runs only once",
   "fold-first": "Clocks repeat this time; 1st of 2 runs",
   "fold-second": "Clocks repeat this time; 2nd of 2 runs",
+  "fold-maybe-twice": "Clocks repeat this time; may run again",
 };
 const fieldOrder = [
   "second",
@@ -155,12 +156,15 @@ export default function CronPage({
   }, [natural, parsed, state, expression, scheduleZone, dialect, from]);
   const result = explained.result;
 
+  const resolvedDialect = parsed.ok ? parsed.cron.dialect : parsed.dialect;
   const tokens =
     expression.trim().startsWith("@") ||
+    resolvedDialect === "systemd" ||
     (natural && !natural.expressions.length)
       ? []
       : expression
           .trim()
+          .replace(/^cron\((.*)\)$/i, "$1")
           .split(/\s+/)
           .filter(Boolean)
           .filter(
@@ -170,7 +174,9 @@ export default function CronPage({
     parsed.ok ? [] : parsed.errors.map((error) => error.field),
   );
   const names =
-    tokens.length === 5
+    resolvedDialect === "eventbridge"
+      ? ["minute", "hour", "dayOfMonth", "month", "dayOfWeek", "year"]
+      : tokens.length === 5
       ? ["minute", "hour", "dayOfMonth", "month", "dayOfWeek"]
       : fieldOrder;
   const update = (changes: Partial<CronState>) =>
@@ -198,7 +204,7 @@ export default function CronPage({
         </div>
       </section>
       <div className="cron-layout">
-        <aside className="settings cron-settings" aria-label="Cron settings">
+        <aside className="settings cron-settings auto-scrollbar" aria-label="Cron settings">
           <section className="settings-section">
             <div className="section-heading">
               <span className="step-number">01</span>
@@ -249,7 +255,7 @@ export default function CronPage({
                     }
                   >
                     <code>{token}</code>
-                    <span>{fieldLabels(tokens.length)[index] ?? "extra"}</span>
+                    <span>{fieldLabels(tokens.length, resolvedDialect)[index] ?? "extra"}</span>
                   </li>
                 ))}
               </ol>

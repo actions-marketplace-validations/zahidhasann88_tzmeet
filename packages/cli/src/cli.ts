@@ -22,7 +22,12 @@ import {
   formatCron,
   formatNatural,
 } from "./cron.js";
-import { checkCronFiles, formatCheck } from "./check.js";
+import {
+  checkCronFiles,
+  checkFormats,
+  formatCheck,
+  type CheckFormat,
+} from "./check.js";
 import { formatRecurring } from "./recurring.js";
 import { applyBusy } from "./busy.js";
 
@@ -56,7 +61,7 @@ export function runCLI(
   const program = new Command();
   program
     .name("tzmeet")
-    .version("0.4.0")
+    .version("0.5.0")
     .description(
       "Find humane meeting slots across IANA time zones. No backend or calendar upload.",
     )
@@ -222,11 +227,11 @@ No slots found is a successful search (exit 0); invalid input exits 1.
   program
     .command("cron <expression...>")
     .description(
-      "Explain, convert or check cron schedules (Unix, Kubernetes, Spring, Quartz): next runs, DST warnings",
+      "Explain, convert or check cron schedules (Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins, systemd): next runs, DST warnings",
     )
     .option(
       "--dialect <name>",
-      "unix, kubernetes, spring or quartz (default: detected from the expression)",
+      "unix, kubernetes, spring, quartz, eventbridge, github, jenkins or systemd (default: detected from the expression)",
     )
     .option("--zone <id>", "zone the schedule runs in (default: UTC)")
     .option(
@@ -237,7 +242,7 @@ No slots found is a successful search (exit 0); invalid input exits 1.
     .option("--from <iso>", "list runs after this instant (default: now)")
     .option(
       "--to <dialect>",
-      "convert to unix, kubernetes, spring or quartz syntax",
+      "convert to unix, kubernetes, spring, quartz, eventbridge, github, jenkins or systemd syntax",
     )
     .option(
       "--to-zone <id>",
@@ -245,10 +250,10 @@ No slots found is a successful search (exit 0); invalid input exits 1.
     )
     .option(
       "--check",
-      "treat the arguments as files/folders: check crontabs and Kubernetes CronJob YAML for DST problems",
+      "treat the arguments as files/folders: check crontabs, Kubernetes CronJobs, GitHub workflows, systemd timers, Jenkinsfiles and EventBridge schedules for DST problems",
     )
     .option("--strict", "with --check: also fail on warnings")
-    .option("--format <format>", "with --check: text or github (annotations)")
+    .option("--format <format>", "with --check: text, github (annotations), gitlab (Code Quality JSON) or sarif")
     .addHelpText(
       "after",
       `
@@ -256,6 +261,8 @@ Quote the expression so the shell doesn't expand *:
   tzmeet cron "30 2 * * *" --zone America/New_York
   tzmeet cron "0 0 9 ? * MON-FRI" --dialect quartz --zone Asia/Dhaka
   tzmeet cron "0 1 * * *" --dialect kubernetes --zone Europe/London --json
+  tzmeet cron "cron(0 9 ? * MON-FRI *)" --zone Europe/Berlin
+  tzmeet cron "Mon..Fri *-*-* 09:00:00 Asia/Dhaka"
 
 Convert:
   tzmeet cron "0 9 * * 1-5" --to quartz
@@ -288,26 +295,21 @@ Check files in CI (exit 1 on DST problems; --zone is used where none is set):
         const from =
           options.from ?? (context.now?.() ?? new Date()).toISOString();
         if (options.check) {
-          if (
-            options.format !== undefined &&
-            options.format !== "text" &&
-            options.format !== "github"
-          )
+          const format = (options.format ?? "text") as CheckFormat;
+          if (!checkFormats.includes(format))
             throw new Error(
-              `--format must be text or github, received ${JSON.stringify(options.format)}`,
+              `--format must be text, github, gitlab or sarif, received ${JSON.stringify(options.format)}`,
             );
           const result = checkCronFiles(parts, {
             cwd: context.cwd ?? process.cwd(),
             zone: options.zone ?? "UTC",
             from,
+            ...(options.zone ? { localZone: options.zone } : {}),
           });
           writeOut(
             json
               ? `${JSON.stringify(result, null, 2)}\n`
-              : formatCheck(
-                  result,
-                  options.format === "github" ? "github" : "text",
-                ),
+              : formatCheck(result, format, program.version()),
           );
           const failing = result.findings.filter(
             (finding) => finding.severity === "error" || options.strict,

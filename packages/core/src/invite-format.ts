@@ -2,6 +2,12 @@ import { DateTime, IANAZone } from "luxon";
 import { scanTransitions } from "./transitions.js";
 import type { RecurringImpact } from "./recurring.js";
 import type { Slot } from "./types.js";
+import {
+  holidayPresets,
+  presetHolidays,
+  presetNote,
+  type HolidayPreset,
+} from "./holidays.js";
 
 export function inviteText(slot: Slot): string {
   const first = DateTime.fromISO(slot.zones[0]!.localStart, {
@@ -213,6 +219,70 @@ export function recurringCalendarText(
       "STATUS:CONFIRMED",
       "TRANSP:OPAQUE",
       "END:VEVENT",
+      "END:VCALENDAR",
+    ]
+      .map(foldLine)
+      .join("\r\n") + "\r\n"
+  );
+}
+
+const dateValue = (date: string) => date.replaceAll("-", "");
+const nextDay = (date: string) =>
+  dateValue(
+    DateTime.fromISO(date, { zone: "UTC" }).plus({ days: 1 }).toISODate()!,
+  );
+
+export function holidayCalendarText(
+  preset: HolidayPreset,
+  options: { years: readonly number[]; created: string },
+): string {
+  const country = holidayPresets[preset];
+  const holidays = options.years.flatMap((year) =>
+    presetHolidays(preset, year),
+  );
+  const notes = options.years
+    .map((year) => presetNote(preset, year))
+    .filter((note): note is string => note !== null);
+  const description = [
+    `Public holidays for ${country}, ${options.years.join(" and ")}, from tzmeet.`,
+    ...(holidays.some((holiday) => holiday.approximate)
+      ? [
+          "Dates marked approximate depend on moon sighting and may move by a day or two.",
+        ]
+      : []),
+    ...notes,
+  ].join(" ");
+  const events = holidays.flatMap((holiday) => [
+    "BEGIN:VEVENT",
+    `UID:${preset}-${holiday.date}-${holiday.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")}@tzmeet.local`,
+    `DTSTAMP:${stamp(options.created)}`,
+    `DTSTART;VALUE=DATE:${dateValue(holiday.date)}`,
+    `DTEND;VALUE=DATE:${nextDay(holiday.date)}`,
+    `SUMMARY:${escapeText(holiday.approximate ? `${holiday.name} (approximate)` : holiday.name)}`,
+    `DESCRIPTION:${escapeText(
+      holiday.approximate
+        ? `${country} public holiday. The date depends on moon sighting and may move by a day or two.`
+        : `${country} public holiday.`,
+    )}`,
+    "CATEGORIES:Holiday",
+    "TRANSP:TRANSPARENT",
+    "END:VEVENT",
+  ]);
+  return (
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      `PRODID:-//tzmeet//Public holidays ${preset}//EN`,
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      `X-WR-CALNAME:${escapeText(`Public holidays: ${country}`)}`,
+      `X-WR-CALDESC:${escapeText(description)}`,
+      "REFRESH-INTERVAL;VALUE=DURATION:P1D",
+      "X-PUBLISHED-TTL:P1D",
+      ...events,
       "END:VCALENDAR",
     ]
       .map(foldLine)

@@ -15,7 +15,8 @@ import {
 } from "./parse.js";
 
 type GapPolicy = "skip" | "catch-up";
-type FoldPolicy = "once" | "twice";
+/** "unconfirmed": the engine doesn't document what happens in a repeated hour. */
+type FoldPolicy = "once" | "twice" | "unconfirmed";
 function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
   switch (cron.dialect) {
     case "unix":
@@ -28,6 +29,14 @@ function policy(cron: ParsedCron): { gap: GapPolicy; fold: FoldPolicy } {
       return { gap: "skip", fold: "twice" };
     case "quartz":
       return { gap: "skip", fold: "once" };
+    case "eventbridge":
+      return { gap: "skip", fold: "once" };
+    case "github":
+      return { gap: "catch-up", fold: "unconfirmed" };
+    case "jenkins":
+      return { gap: "skip", fold: "twice" };
+    case "systemd":
+      return { gap: "skip", fold: "unconfirmed" };
   }
 }
 
@@ -37,7 +46,7 @@ export const cronExplainSchema = z
     dialect: z
       .enum(cronDialects as [CronDialect, ...CronDialect[]], {
         errorMap: () => ({
-          message: "dialect must be unix, kubernetes, spring or quartz",
+          message: `dialect must be one of: ${cronDialects.join(", ")}`,
         }),
       })
       .optional(),
@@ -65,7 +74,8 @@ export type CronRunNote =
   | "gap-catch-up"
   | "fold-once"
   | "fold-first"
-  | "fold-second";
+  | "fold-second"
+  | "fold-maybe-twice";
 export interface CronRunZone {
   zone: string;
   local: string;
@@ -82,7 +92,9 @@ export type CronWarningCode =
   | "dst-skip"
   | "dst-late"
   | "dst-double"
+  | "dst-maybe-double"
   | "dst-once"
+  | "jenkins-hash"
   | "zone-shift"
   | "dom-dow-or"
   | "dom-dow-and"
@@ -271,12 +283,13 @@ export function explainCron(input: CronExplainInput): CronExplanation {
           value: expression,
         },
       ]);
-    warnings.push({
-      code: "k8s-inline-timezone",
-      severity: "warning",
-      message:
-        "Kubernetes doesn't support CRON_TZ= or TZ= inside the schedule. Set spec.timeZone instead.",
-    });
+    if (cron.dialect === "kubernetes")
+      warnings.push({
+        code: "k8s-inline-timezone",
+        severity: "warning",
+        message:
+          "Kubernetes doesn't support CRON_TZ= or TZ= inside the schedule. Set spec.timeZone instead.",
+      });
     zone ??= cron.prefixZone;
   }
   if (!zone) {
@@ -289,11 +302,28 @@ export function explainCron(input: CronExplainInput): CronExplanation {
         "Spring uses the server's default time zone unless @Scheduled sets zone",
       quartz:
         "Quartz uses the scheduler's default time zone unless the trigger sets one",
+      eventbridge:
+        "EventBridge rules run in UTC; EventBridge Scheduler uses UTC unless ScheduleExpressionTimezone is set",
+      github:
+        "GitHub Actions runs schedules in UTC unless the schedule sets timezone:",
+      jenkins:
+        "Jenkins uses the controller's time zone unless the schedule starts with a TZ= line",
+      systemd:
+        "systemd uses the machine's local time zone unless OnCalendar= ends with a time zone",
     }[cron.dialect];
     warnings.push({
       code: "zone-assumed",
       severity: "info",
       message: `${where}. Times below assume UTC.`,
+    });
+  }
+
+  if (cron.hashed?.length) {
+    const fields = cron.hashed.map((field) => ({ second: "second", minute: "minute", hour: "hour", dayOfMonth: "day of month", month: "month", dayOfWeek: "day of week", year: "year" })[field]);
+    warnings.push({
+      code: "jenkins-hash",
+      severity: "info",
+      message: `H means Jenkins picks one fixed value per job from its name, so the exact ${fields.join(" and ")} ${fields.length > 1 ? "aren't" : "isn't"} known here. Runs below use the first possible value.`,
     });
   }
 
@@ -330,7 +360,7 @@ export function explainCron(input: CronExplainInput): CronExplanation {
       if (rules.fold === "twice") {
         add(first, "fold-first");
         add(last, "fold-second");
-      } else add(first, "fold-once");
+      } else add(first, rules.fold === "once" ? "fold-once" : "fold-maybe-twice");
     } else add(wall.instants[0]!);
     if (pending.length >= count && stopAt === Infinity)
       stopAt = rules.fold === "twice" ? match + 3 * hour : match;
@@ -406,6 +436,13 @@ export function explainCron(input: CronExplainInput): CronExplanation {
         severity: "warning",
         at,
         message: `${when}, clocks go back from ${shift}, so the ${runs} happen${several ? "" : "s"} twice.`,
+      });
+    else if (rules.fold === "unconfirmed")
+      warnings.push({
+        code: "dst-maybe-double",
+        severity: "warning",
+        at,
+        message: `${when}, clocks go back from ${shift}, so ${times} happens twice. ${name} doesn't document what it does then; it may run twice.`,
       });
     else
       warnings.push({

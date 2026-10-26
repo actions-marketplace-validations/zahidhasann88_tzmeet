@@ -744,3 +744,248 @@ test("downloads a meeting as a weekly calendar series", async ({ page }) => {
   expect(text).toContain("DTSTART;TZID=Asia/Dhaka:");
   expect(text).toContain("BEGIN:VTIMEZONE");
 });
+
+test.describe("team hours page", () => {
+  test.use({ timezoneId: "Europe/London" });
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  const platform = {
+    v: 1,
+    t: "Platform",
+    p: [
+      { n: "Zahid", z: "Asia/Dhaka", h: "BD" },
+      { n: "Ana", z: "Europe/London", w: "09:00-17:30" },
+      { n: "Ben", z: "America/New_York", w: "09:00-17:00" },
+    ],
+  };
+
+  test("shows who's working and when hours overlap, in the viewer's time zone", async ({
+    page,
+  }) => {
+    // Monday 26 October 2026, 10:15 in London.
+    await page.clock.setFixedTime(new Date("2026-10-26T10:15:00Z"));
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(`./team/#s=${encode(platform)}`);
+    await expect(
+      page.getByRole("heading", { name: "When Platform is available." }),
+    ).toBeVisible();
+    const status = page.locator(".me-status");
+    await expect(status).toContainText("2 of 3 working now");
+    await expect(status).toContainText("Mon 16:15 in Dhaka · Working");
+    await expect(status).toContainText("Mon 06:15 in New York · Off");
+    const best = page.locator(".team-best");
+    await expect(best).toContainText(
+      "No time when everyone works this week. Most overlap: 2 of 3",
+    );
+    await expect(best).toContainText(
+      "Mon 26 Oct, 13:00–17:30 4 h 30 min · Ana, Ben",
+    );
+    await expect(page.locator(".team-grid tbody tr")).toHaveCount(7);
+    await expect(
+      page.locator(".team-grid tbody tr").first().locator("td").nth(20),
+    ).toHaveAttribute("title", "Mon 26 Oct 10:00: 2 of 3 working (Zahid, Ana)");
+    await expect(page.getByLabel("Name, person 1")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    const audit = await new AxeBuilder({ page })
+      .include("main")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(audit.violations).toEqual([]);
+
+    await page.getByRole("link", { name: "Find a meeting time" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Find common ground." }),
+    ).toBeVisible();
+    const state = decodeState(new URL(page.url()).search)!;
+    expect(state.input.zones.map((zone) => zone.label)).toEqual([
+      "Zahid",
+      "Ana",
+      "Ben",
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  test("builds a team from scratch and from My hours links, and copies a link", async ({
+    page,
+    context,
+  }) => {
+    await mockClipboard(page);
+    await page.goto("./#/team");
+    await expect(
+      page.getByRole("heading", { name: "Share your team's hours." }),
+    ).toBeVisible();
+    await page.getByLabel("Team name").fill("Platform");
+    await page.getByLabel("Name, person 1").fill("Zahid");
+    await page.getByLabel("Time zone, person 1").fill("Asia/Dhaka");
+    await expect(page.getByLabel("Fri weekend, person 1")).toBeChecked();
+    await page.getByLabel("Name, person 2").fill("Ana");
+    await page
+      .getByLabel("My hours link")
+      .fill(
+        "https://example.com/tzmeet/me/#n=Ben&z=America%2FNew_York&w=09:00-17:00&d=67",
+      );
+    await page.getByRole("button", { name: "Add from link" }).click();
+    await expect(page.getByLabel("Name, person 3")).toHaveValue("Ben");
+    await expect(page.getByLabel("Work ends, person 3")).toHaveValue("17:00");
+    await page.getByLabel("My hours link").fill("https://example.com/");
+    await page.getByRole("button", { name: "Add from link" }).click();
+    await expect(page.getByRole("alert")).toHaveText(
+      "That isn't a My hours link.",
+    );
+    await page.getByRole("button", { name: "Copy team link" }).click();
+    const link = await page.evaluate(
+      () => document.documentElement.dataset.clipboard!,
+    );
+    expect(new URL(link).pathname.endsWith("/team/")).toBe(true);
+    const opened = await context.newPage();
+    await opened.goto(link);
+    await expect(
+      opened.getByRole("heading", { name: "When Platform is available." }),
+    ).toBeVisible();
+    await expect(opened.locator(".team-people li")).toHaveCount(3);
+    await opened
+      .getByRole("button", { name: "Edit a copy of this team" })
+      .click();
+    await expect(opened.getByLabel("Name, person 3")).toHaveValue("Ben");
+  });
+
+  test("has its own link preview", async ({ page }) => {
+    const teamPage = await (await page.request.get("./team/")).text();
+    expect(teamPage).toContain("og/tzmeet-team.png");
+  });
+});
+
+test("downloads or subscribes to a country's public holidays", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-23T09:35:00Z"));
+  await page.goto("./me/#n=Zahid&z=Asia%2FDhaka&w=09:00-18:00&d=56&h=BD");
+  const holidays = page.locator(".me-holidays");
+  await expect(holidays).toBeVisible();
+  const downloading = page.waitForEvent("download");
+  await holidays
+    .getByRole("button", {
+      name: "Download Bangladesh holidays for Zahid (.ics)",
+    })
+    .click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe("tzmeet-holidays-BD-2026-2027.ics");
+  const text = await readFile(await download.path(), "utf8");
+  expect(text).toContain("X-WR-CALNAME:Public holidays: Bangladesh");
+  expect(text).toContain("DTSTART;VALUE=DATE:20271216");
+
+  await holidays.getByText("Subscribe in your calendar").click();
+  await expect(
+    holidays.getByRole("link", { name: "Apple Calendar or Outlook" }),
+  ).toHaveAttribute(
+    "href",
+    "webcal://tzmeet-api.onrender.com/v1/holidays.ics?preset=BD",
+  );
+  await expect(
+    holidays.getByRole("link", { name: "Google Calendar" }),
+  ).toHaveAttribute(
+    "href",
+    /^https:\/\/calendar\.google\.com\/calendar\/r\?cid=webcal%3A%2F%2F/,
+  );
+  await expect(
+    holidays.getByLabel("Bangladesh holiday calendar address for Zahid"),
+  ).toHaveValue("https://tzmeet-api.onrender.com/v1/holidays.ics?preset=BD");
+  const audit = await new AxeBuilder({ page })
+    .include(".me-holidays")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+
+  await page.goto("./");
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByLabel("Dhaka public holidays").selectOption("BD");
+  await expect(
+    page.getByRole("button", {
+      name: "Download Bangladesh holidays for Dhaka (.ics)",
+    }),
+  ).toBeVisible();
+});
+
+test("previews and copies a status badge for My hours", async ({ page }) => {
+  await mockClipboard(page);
+  await page.clock.setFixedTime(new Date("2026-10-14T05:00:00Z"));
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("./#/me");
+  await page.getByLabel("Your name").fill("Zahid");
+  await page.getByLabel("Your time zone", { exact: true }).fill("Asia/Dhaka");
+  const badge = page.locator(".me-badge");
+  await expect(
+    badge.getByRole("img", { name: "Badge preview: Zahid's working hours" }),
+  ).toBeVisible();
+  const preview = await badge.locator("img").getAttribute("src");
+  expect(decodeURIComponent(preview!)).toContain(
+    'aria-label="Zahid: working (Asia/Dhaka)"',
+  );
+  await badge.getByRole("button", { name: "Copy Markdown" }).click();
+  const markdown = await page.evaluate(
+    () => document.documentElement.dataset.clipboard!,
+  );
+  expect(markdown).toMatch(
+    /^\[!\[Zahid's working hours\]\(https:\/\/tzmeet-api\.onrender\.com\/v1\/badge\.svg\?n=Zahid&z=Asia%2FDhaka&w=09%3A00-18%3A00&d=56&h=BD\)\]\(http.+\/me\/#n=Zahid&z=Asia%2FDhaka/,
+  );
+  await badge.getByRole("button", { name: "Copy HTML" }).click();
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.clipboard!),
+  ).toMatch(/^<a href="http.+\/me\/#n=Zahid&amp;z=/);
+  expect(requests.some((url) => url.includes("onrender.com"))).toBe(false);
+  const audit = await new AxeBuilder({ page })
+    .include(".me-badge")
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(audit.violations).toEqual([]);
+});
+
+test("keeps controls and previews in view on long pages, on wide screens", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === "mobile", "Phones show one column");
+  await page.setViewportSize({ width: 1440, height: 800 });
+  const top = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((element) => Math.round(element.getBoundingClientRect().top));
+  await open(page);
+  await expect(page.locator(".slot-card").first()).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await expect.poll(() => top(".workspace > .settings")).toBe(16);
+  const settings = page.locator(".workspace > .settings");
+  await expect(settings).toHaveCSS("overflow-y", "auto");
+  await expect(settings).toHaveCSS(
+    "scrollbar-color",
+    "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)",
+  );
+  await settings.evaluate((element) => element.scrollBy(0, 40));
+  await expect(settings).toHaveClass(/is-scrolling/);
+  await expect(settings).not.toHaveCSS(
+    "scrollbar-color",
+    "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)",
+  );
+  await expect(settings).not.toHaveClass(/is-scrolling/, { timeout: 3000 });
+
+  const team = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      p: ["Asia/Dhaka", "Europe/London", "America/New_York", "Asia/Tokyo"].map(
+        (z) => ({ z }),
+      ),
+    }),
+  ).toString("base64url");
+  await page.goto(`./#/team?s=${team}`);
+  await page.getByRole("button", { name: "Edit a copy of this team" }).click();
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect(page.getByLabel("Name, person 3")).toBeInViewport();
+  await expect.poll(() => top(".me-view")).toBe(16);
+  await expect(page.locator(".team-grid")).toBeInViewport();
+});

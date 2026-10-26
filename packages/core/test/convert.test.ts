@@ -85,7 +85,7 @@ describe("convertCronDialect", () => {
 
   it("explains numbering, seconds and inline time zones", () => {
     expect(convert("0 0 9 ? * 2-6", "quartz", "unix").notes).toContain(
-      "Day-of-week numbers are converted: Quartz counts Sunday as 1, the others count Monday as 1.",
+      "Day-of-week numbers are converted: Quartz counts Sunday as 1, Unix cron counts Monday as 1.",
     );
     expect(convert("0 9 * * *", "unix", "spring").notes).toContain(
       "Spring adds a seconds field; runs happen at second 0.",

@@ -22,10 +22,13 @@ Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wr
 | `POST /v1/slots` | Same, with a JSON body for per-city settings |
 | `GET /v1/zones?search=dhaka` | Search time zone names |
 | `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a time |
-| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring or Quartz): next runs and DST warnings |
+| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins or systemd): next runs and DST warnings |
 | `GET /v1/cron/convert?expression=0 9 * * 1-5&to=quartz&zone=Asia/Dhaka&toZone=UTC` | Convert a cron expression to another syntax and/or a server's time zone |
 | `GET /v1/cron/natural?text=every weekday at 9am Dhaka&dialect=kubernetes` | Turn plain English into a cron expression |
 | `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |
+| `GET /v1/holidays?preset=BD&year=2027` | A country's public holidays for one year (approximate dates marked) |
+| `GET /v1/holidays.ics?preset=BD` | The same as a calendar feed for this year and next: subscribe in Google, Apple or Outlook calendar |
+| `GET /v1/badge.svg?n=Zahid&z=Asia/Dhaka&w=09:00-18:00&d=56&h=BD` | A small badge saying whether someone is working now (working, off, weekend or holiday), with the same parameters as a My hours link. Cached for 5 minutes |
 | `GET /v1/health` | Health check |
 | `GET /docs` | Interactive docs |
 
