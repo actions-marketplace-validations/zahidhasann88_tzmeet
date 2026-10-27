@@ -58,7 +58,7 @@ describe("CI and deployment contracts", () => {
       "pull_request",
       "workflow_dispatch",
     ]);
-    expect(ci.jobs.check!.strategy!.matrix.node).toEqual([20, 22, 24]);
+    expect(ci.jobs.check!.strategy!.matrix.node).toEqual([22, 24]);
     expect(ci.permissions).toEqual({ contents: "read" });
     const commands = ci.jobs
       .check!.steps!.map((step) => step.run)

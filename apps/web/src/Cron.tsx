@@ -494,8 +494,8 @@ export default function CronPage({
               />
               <p className="result-disclaimer">
                 DST behaviour follows each engine's source and docs: cronie,
-                robfig/cron, Spring and Quartz. Uses your browser's time zone
-                data.
+                robfig/cron, Spring, Quartz, AWS EventBridge, GitHub Actions,
+                Jenkins and systemd. Uses your browser's time zone data.
               </p>
             </>
           )}

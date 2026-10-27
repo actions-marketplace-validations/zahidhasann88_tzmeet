@@ -2,7 +2,7 @@ variables:
   TZMEET_PATHS: "."
   TZMEET_ZONE: "UTC"
   TZMEET_STRICT: "false"
-  TZMEET_VERSION: "0.5.0"
+  TZMEET_VERSION: "0.6.0"
 
 tzmeet-cron-check:
   stage: test

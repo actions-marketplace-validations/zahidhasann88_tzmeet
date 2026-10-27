@@ -21,7 +21,7 @@ inputs:
   version:
     description: tzmeet version to run from npm.
     required: false
-    default: "0.5.0"
+    default: "0.6.0"
 
 runs:
   using: composite

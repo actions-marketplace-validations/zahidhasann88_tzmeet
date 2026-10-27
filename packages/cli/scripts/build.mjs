@@ -11,7 +11,7 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node20',
+  target: 'node22',
   // Only commander remains a runtime dependency. Core/Luxon/adhan/zod/yaml are bundled.
   external: ['commander'],
   sourcemap: true,

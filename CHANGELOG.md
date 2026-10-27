@@ -2,6 +2,19 @@
 
 Notable changes are recorded here. Package versions follow semantic versioning.
 
+## [0.6.0] - 2026-10-27
+
+### Changed
+
+- Node 22.12 or newer is now required (`engines` in `tzmeet`, `@tzmeet/api` and the workspace). Node 20 reached end of life in April 2026. CI tests Node 22 and 24.
+- `@tzmeet/core` and `@tzmeet/api` now use Zod 4. The schemas `@tzmeet/core` exports are Zod 4 schemas, so code that extends or composes them needs Zod 4 as well. `@tzmeet/api` moves to `@hono/zod-openapi` 1.x and `@scalar/hono-api-reference` 0.12. Error messages for out-of-range `days`, `durationMinutes` and `stepMinutes` are unchanged.
+- The cron page's description and its DST note now name all eight supported engines, including AWS EventBridge, GitHub Actions, Jenkins and systemd.
+- Rewrote the READMEs: the root README is an overview of the packages, and each package README covers its own installation and usage. `@tzmeet/core` is documented as source-only, since it isn't published to npm.
+
+### Security
+
+- Dependency updates that clear every `pnpm audit` advisory: Zod (memory exhaustion on oversized collections), vitest and tinypool (dev only), and undici, fast-uri and postcss-selector-parser (dev-only transitive dependencies).
+
 ## [0.5.0] - 2026-10-25
 
 ### Added

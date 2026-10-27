@@ -43,6 +43,7 @@ export function readConfig(cwd: string, explicitPath?: string): unknown {
       return {};
     throw new Error(
       `Cannot read config ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
   try {

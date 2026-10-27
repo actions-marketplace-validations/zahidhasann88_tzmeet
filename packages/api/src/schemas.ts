@@ -107,7 +107,7 @@ const top = z
       .min(1, "top must be at least 1")
       .max(50, "top must be at most 50"),
   )
-  .default("10")
+  .prefault("10")
   .openapi({ description: "Number of returned slots (1–50)", example: "2" });
 export const resultQuerySchema = z
   .object({
@@ -131,7 +131,7 @@ export const slotsGetQuerySchema = resultQuerySchema.extend({
       "zones must contain at most 8 participants",
     )
     .openapi({ example: "Asia/Dhaka,Europe/London" }),
-  date: findSlotsSchema.shape.startDate.openapi({ example: "2026-11-02" }),
+  date: findSlotsSchema.shape.startDate.meta({ example: "2026-11-02" }),
   duration: numeric("duration", 5, 480),
   days: numeric("days", 1, 14),
   step: numeric("step", 5, 1440),
@@ -171,9 +171,9 @@ export const apiConversionSchema = conversionSchema.extend({
 export const convertQuerySchema = apiConversionSchema
   .omit({ to: true })
   .extend({
-    time: conversionSchema.shape.time.openapi({ example: "2026-11-02T10:00" }),
-    from: conversionSchema.shape.from.openapi({ example: "Asia/Dhaka" }),
-    disambiguation: conversionSchema.shape.disambiguation.openapi({
+    time: conversionSchema.shape.time.meta({ example: "2026-11-02T10:00" }),
+    from: conversionSchema.shape.from.meta({ example: "Asia/Dhaka" }),
+    disambiguation: conversionSchema.shape.disambiguation.meta({
       example: "reject",
     }),
     to: z
@@ -377,7 +377,7 @@ const count = z
       .min(1, "count must be at least 1")
       .max(50, "count must be at most 50"),
   )
-  .default("10")
+  .prefault("10")
   .openapi({ description: "Number of runs to list (1–50)", example: "3" });
 export const cronQuerySchema = z
   .object({
@@ -471,7 +471,7 @@ const weeks = z
       .min(1, "weeks must be at least 1")
       .max(52, "weeks must be at most 52"),
   )
-  .default("26")
+  .prefault("26")
   .openapi({ description: "Weeks to follow (1–52)", example: "30" });
 export const recurringQuerySchema = slotsGetQuerySchema
   .omit({ top: true, format: true, rotation: true, days: true, step: true })

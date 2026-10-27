@@ -1,69 +1,86 @@
 # @tzmeet/core
 
-The scheduling engine behind tzmeet. Finds meeting times that work across time zones. Runs in Node and the browser, with no network requests.
+Scheduling engine for finding meeting times across time zones and working with cron schedules.
 
-## Usage
+## Features
+
+- Ranked meeting slots with per-zone work hours, weekends, holidays, busy times and prayer times.
+- Daylight saving aware: clock-change detection, recurring meetings and cron DST warnings.
+- Cron parsing, explanation and conversion for eight dialects, including plain English input.
+- `.ics` output for slots, weekly series and holiday calendars.
+
+## Installation
+
+Not published to npm. Inside the tzmeet monorepo, add it as a workspace dependency:
+
+```json
+{ "dependencies": { "@tzmeet/core": "workspace:*" } }
+```
+
+## Quick start
 
 ```ts
-import { findSlots } from '@tzmeet/core';
+import { findSlots } from "@tzmeet/core";
 
 const result = findSlots({
   zones: [
-    { id: 'Asia/Dhaka', label: 'Dhaka' },
-    { id: 'America/New_York', label: 'New York', workStart: '08:00', workEnd: '17:00' },
-    { id: 'Europe/London', label: 'London' },
+    { id: "Asia/Dhaka" },
+    { id: "America/New_York", workStart: "08:00", workEnd: "17:00" },
   ],
-  startDate: '2026-11-02',
-  durationMinutes: 30,
+  startDate: "2026-11-02",
 });
 
-for (const slot of result.slots.slice(0, 5)) {
-  console.log(slot.reason);
-}
-
-if (result.slots.length === 0) {
-  console.log(result.diagnostics.message, result.diagnostics.suggestion);
-}
+console.log(result.slots[0]?.reason ?? result.diagnostics.message);
 ```
 
-## Main functions
+## API
 
-- `findSlots(input)` – returns the best meeting times, best first.
-- `validateInput(input)` – checks input and returns friendly error messages.
-- `listTimeZones(search?)` – lists time zone names.
-- `convertTime({ time, from, to })` – converts a local time to other zones.
-- `listTransitions(zone, from, to)` – daylight saving and other clock changes in a date range, each marked `gap` (clocks jump forward) or `fold` (clocks repeat).
-- `resolveLocal(zone, localDateTime)` – tells you whether a local time is `ok`, `skipped` (inside a gap) or `ambiguous` (happens twice), with the real instants.
-- `explainCron({ expression, from, zone?, dialect?, count?, displayZones? })` – explains a Unix, Kubernetes, Spring, Quartz, AWS EventBridge, GitHub Actions, Jenkins (`H`) or systemd `OnCalendar=` expression in plain English, lists its next runs in any zones, and warns about runs that daylight saving skips or repeats. Each engine's own DST behaviour is applied.
-- `parseCron(expression, dialect?)` – checks a cron expression and returns field-by-field errors.
-- `convertCronDialect(expression, { from?, to })` – converts between any of these syntaxes, and says what the target can't express.
-- `parseNaturalCron(text, { dialect? })` – turns plain English ("every weekday at 9am Dhaka") into cron, with the zone it names and the scheduler's time-zone setting.
-- `recurringCalendarText(impact, { created, title? })` – a weekly meeting from `recurringImpact` as an `.ics` series that calendars keep right through daylight saving.
-- `convertCronZone({ expression, fromZone, toZone, from })` – rewrites a schedule for a scheduler in another time zone, with one expression per daylight saving period and the scheduler's own time-zone setting as the recommended fix.
-- `recurringImpact({ zones, startDate, time, weeks?, durationMinutes? })` – follows a weekly meeting (fixed at `time` in the first zone) through the coming weeks and shows where each zone's local time moves because of daylight saving, and why.
-- `fairRotation(result, { size: 2 | 3 })` – picks times from a search to alternate week by week, so the inconvenient slot is shared instead of always falling on the same city.
-- `holidayCalendarText(preset, { years, created })` – a holiday preset as an `.ics` calendar of all-day events, with stable IDs so subscribed calendars update instead of duplicating.
-- `availabilityNow(zone, at)` – whether someone is working at an instant, or off, on their weekend or on a holiday (with its name).
-- `badgeSvg({ label, status, holiday?, zone })` – a small shields-style status badge as SVG text.
-- `getPrayerWindows(date, rule)` – prayer times for a day.
-- `inviteText(slot)`, `calendarText(slot, created)` – invite text and `.ics` content.
+| Function | Returns |
+| --- | --- |
+| `findSlots(input)` | Ranked slots, plus diagnostics when none are found |
+| `validateInput(input)` | Validation result with readable messages |
+| `fairRotation(result, { size })` | 2 or 3 slots to rotate weekly |
+| `recurringImpact({ zones, startDate, time, weeks? })` | Each zone's local time per week for a weekly meeting |
+| `availabilityNow(zone, at)` | Working, off, weekend or holiday at an instant |
+| `listTimeZones(search?)` | IANA zone names |
+| `convertTime({ time, from, to })` | A local time in other zones |
+| `listTransitions(zone, from, to)` | Clock changes, marked `gap` or `fold` |
+| `resolveLocal(zone, localDateTime)` | `ok`, `skipped` or `ambiguous`, with instants |
+| `explainCron({ expression, from, zone?, dialect? })` | Description, next runs and DST warnings |
+| `parseCron(expression, dialect?)` | Field-by-field validation |
+| `convertCronDialect(expression, { to })` | The expression in another dialect |
+| `convertCronZone({ expression, fromZone, toZone, from })` | The schedule for a scheduler in another zone |
+| `parseNaturalCron(text, { dialect? })` | A cron expression from plain English |
+| `inviteText(slot)`, `calendarText(slot, created)` | Invite text and an `.ics` event |
+| `recurringCalendarText(impact, { created })` | An `.ics` weekly series |
+| `holidayCalendarText(preset, { years, created })` | An `.ics` holiday calendar |
+| `parseIcsBusy(text, { from, to, defaultZone })` | Busy intervals from an `.ics` export |
+| `badgeSvg({ label, status, zone })` | A status badge as SVG text |
 
-## Zone options
+Invalid input to `findSlots` throws `InputValidationError`; call `validateInput` first to get messages instead.
+
+## Configuration
+
+Zone options for `findSlots`:
 
 | Option | Default |
 | --- | --- |
-| `workStart` / `workEnd` | 09:00 / 18:00 |
-| `quietBefore` / `quietAfter` (acceptable hours) | 08:00 / 21:00 |
-| `weekend` (ISO days, 1 = Mon) | `[6, 7]`, or `[5, 6]` in Fri/Sat countries |
-| `holidays` | `[]` (dates as YYYY-MM-DD) |
-| `holidayPreset` | off (`BD`, `GB-ENG`, `IN`, `PK`, `AE` or `US`; see `presetHolidays(preset, year)` and `presetNote(preset, year)`) |
-| `busy` | `[]` (`{ start, end }` ISO instants; read them from an `.ics` file with `parseIcsBusy(text, { from, to, defaultZone })`) |
-| `specialHours` | `[]` (`{ label?, from, to, workStart, workEnd, quietBefore?, quietAfter? }`; `ramadanDates(year, preset?)` gives approximate Ramadan dates) |
-| `optional` | off (`true`: this zone never blocks a time; times it can attend rank higher) |
+| `workStart` / `workEnd` | `"09:00"` / `"18:00"` |
+| `quietBefore` / `quietAfter` (acceptable hours) | `"08:00"` / `"21:00"` |
+| `weekend` (ISO days, 1 = Monday) | `[6, 7]`, or `[5, 6]` in Fri/Sat countries |
+| `holidays` | `[]` (`YYYY-MM-DD` dates) |
+| `holidayPreset` | `BD`, `GB-ENG`, `IN`, `PK`, `AE` or `US` |
+| `busy` | `[]` (`{ start, end }` ISO instants) |
+| `specialHours` | `[]` (`{ from, to, workStart, workEnd }`) |
+| `optional` | `false` |
 | `prayer` | off |
 
-## How scoring works
+A slot is ideal for a zone inside work hours (2 points) and acceptable inside acceptable hours (1 point). Slots that any required zone can't attend are dropped.
 
-Each city gets **ideal** (inside work hours, 2 points), **acceptable** (inside acceptable hours, 1 point) or **blocked** (weekend, holiday, too early/late, or prayer). A time is only shown if no city is blocked. Higher scores come first. Daylight saving changes are handled for you.
+## Compatibility
 
-License: MIT
+Runs in Node.js and browsers. Uses no Node.js or network APIs.
+
+## License
+
+[MIT](LICENSE)

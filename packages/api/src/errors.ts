@@ -36,11 +36,11 @@ const fieldName = (path: string) => {
   };
   return aliases[path] ?? (path.replace(/\.(\d+)(?=\.|$)/g, "[$1]") || "body");
 };
-function valueAtPath(input: unknown, path: (string | number)[]): unknown {
+function valueAtPath(input: unknown, path: readonly PropertyKey[]): unknown {
   return path.reduce<unknown>(
     (value, key) =>
       value !== null && typeof value === "object"
-        ? (value as Record<string, unknown>)[String(key)]
+        ? (value as Record<PropertyKey, unknown>)[key]
         : undefined,
     input,
   );

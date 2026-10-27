@@ -68,7 +68,7 @@ import {
   zonesQuerySchema,
 } from "./schemas.js";
 
-export const API_VERSION = "0.5.0";
+export const API_VERSION = "0.6.0";
 /** Platform-neutral dependencies; injected clocks make app.request() tests deterministic. */
 export type { AppOptions, LogEntry } from "./security.js";
 export { optionsFromEnv } from "./security.js";
@@ -796,7 +796,7 @@ export function createApp(options: AppOptions = {}) {
               .object({
                 openapi: z.string(),
                 info: z.object({ title: z.string(), version: z.string() }),
-                paths: z.record(z.unknown()),
+                paths: z.record(z.string(), z.unknown()),
               })
               .passthrough(),
             example: {
