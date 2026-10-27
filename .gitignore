@@ -14,7 +14,4 @@ release-artifacts/
 **/.wrangler/
 **/.dev.vars*
 
-/build-docs.txt
-/docs/RELEASING.md
 /ROADMAP.md
-/relase-guide.txt

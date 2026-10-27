@@ -223,9 +223,24 @@ const zonesSchema = z
 const fields = {
   zones: zonesSchema,
   startDate: dateSchema,
-  days: z.number().int().min(1).max(31).default(5),
-  durationMinutes: z.number().int().min(1).max(1440).default(30),
-  stepMinutes: z.number().int().min(1).max(1440).default(15),
+  days: z
+    .number()
+    .int()
+    .min(1, "Must be greater than or equal to 1")
+    .max(31, "Must be less than or equal to 31")
+    .default(5),
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1, "Must be greater than or equal to 1")
+    .max(1440, "Must be less than or equal to 1440")
+    .default(30),
+  stepMinutes: z
+    .number()
+    .int()
+    .min(1, "Must be greater than or equal to 1")
+    .max(1440, "Must be less than or equal to 1440")
+    .default(15),
   prayer: prayerSchema.optional(),
 };
 

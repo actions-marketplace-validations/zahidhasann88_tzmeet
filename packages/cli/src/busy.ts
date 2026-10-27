@@ -36,6 +36,7 @@ export function applyBusy(
     } catch (error) {
       throw new Error(
         `Cannot read calendar ${path}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
     const result = parseIcsBusy(text, {

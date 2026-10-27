@@ -312,6 +312,7 @@ test("cron explainer: DST warnings, field errors, zones, link round-trip and acc
   context,
 }) => {
   await mockClipboard(page);
+  await page.clock.setFixedTime(new Date("2026-10-14T05:00:00Z"));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("./#/cron");

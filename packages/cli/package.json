@@ -1,7 +1,7 @@
 {
   "name": "tzmeet",
-  "version": "0.5.0",
-  "description": "Find humane meeting slots across time zones, without a backend",
+  "version": "0.6.0",
+  "description": "Find meeting times across time zones and check cron schedules for daylight saving problems",
   "license": "MIT",
   "homepage": "https://github.com/zahidhasann88/tzmeet/tree/main/packages/cli#readme",
   "repository": {
@@ -14,7 +14,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "bin": {
     "tzmeet": "./dist/bin.js"
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@types/luxon": "^3.7.1",
     "@tzmeet/core": "workspace:*",
-    "esbuild": "^0.25.12",
+    "esbuild": "^0.28.2",
     "luxon": "^3.7.2",
     "yaml": "^2.9.1"
   },
@@ -45,6 +45,8 @@
     "scheduling",
     "cli",
     "prayer",
+    "cron",
+    "daylight-saving",
     "luxon"
   ]
 }

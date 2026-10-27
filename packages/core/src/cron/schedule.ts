@@ -45,9 +45,7 @@ export const cronExplainSchema = z
     expression: z.string().min(1, "Enter a cron expression").max(200),
     dialect: z
       .enum(cronDialects as [CronDialect, ...CronDialect[]], {
-        errorMap: () => ({
-          message: `dialect must be one of: ${cronDialects.join(", ")}`,
-        }),
+        error: `dialect must be one of: ${cronDialects.join(", ")}`,
       })
       .optional(),
     zone: timeZoneIdSchema.optional(),

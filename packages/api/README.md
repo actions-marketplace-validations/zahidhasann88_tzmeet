@@ -1,81 +1,78 @@
 # @tzmeet/api
 
-A simple REST API for finding meeting times across time zones. No database, no accounts.
+Stateless REST API for finding meeting times across time zones and working with cron schedules.
 
-Free demo: **https://tzmeet-api.onrender.com** · [Interactive docs](https://tzmeet-api.onrender.com/docs)
+Demo: https://tzmeet-api.onrender.com ([interactive docs](https://tzmeet-api.onrender.com/docs))
 
-## Run it locally
+## Features
+
+- Meeting slots as JSON, plain text or `.ics`, with per-zone settings in a JSON body.
+- Cron explanation, conversion and plain-English parsing.
+- Holiday calendar feeds and SVG status badges.
+- OpenAPI document at `/openapi.json` and interactive docs at `/docs`.
+- Optional API keys, CORS and per-IP rate limiting. No database.
+
+## Installation
+
+```sh
+docker run -p 3000:3000 ghcr.io/zahidhasann88/tzmeet/tzmeet-api:0.6.0
+```
+
+From a clone of the [tzmeet repository](https://github.com/zahidhasann88/tzmeet):
 
 ```sh
 pnpm install
 pnpm --filter @tzmeet/api... build
-pnpm --filter @tzmeet/api start     # http://localhost:3000
+pnpm --filter @tzmeet/api start
 ```
 
-Or use the `Dockerfile` in this folder, or deploy to Cloudflare Workers with `wrangler.toml`.
-
-## Endpoints
-
-| Endpoint | What it does |
-| --- | --- |
-| `GET /v1/slots?zones=...&date=...` | Find meeting times |
-| `POST /v1/slots` | Same, with a JSON body for per-city settings |
-| `GET /v1/zones?search=dhaka` | Search time zone names |
-| `GET /v1/convert?time=2026-11-02T10:00&from=Asia/Dhaka&to=Europe/London` | Convert a time |
-| `GET /v1/cron?expression=30 2 * * *&zone=America/New_York&display=Asia/Dhaka,UTC` | Explain a cron expression (Unix, Kubernetes, Spring, Quartz, EventBridge, GitHub Actions, Jenkins or systemd): next runs and DST warnings |
-| `GET /v1/cron/convert?expression=0 9 * * 1-5&to=quartz&zone=Asia/Dhaka&toZone=UTC` | Convert a cron expression to another syntax and/or a server's time zone |
-| `GET /v1/cron/natural?text=every weekday at 9am Dhaka&dialect=kubernetes` | Turn plain English into a cron expression |
-| `GET /v1/recurring?zones=Europe/London,America/New_York&date=2026-10-12&time=14:00&weeks=26` | Follow a weekly meeting through DST changes, week by week |
-| `GET /v1/holidays?preset=BD&year=2027` | A country's public holidays for one year (approximate dates marked) |
-| `GET /v1/holidays.ics?preset=BD` | The same as a calendar feed for this year and next: subscribe in Google, Apple or Outlook calendar |
-| `GET /v1/badge.svg?n=Zahid&z=Asia/Dhaka&w=09:00-18:00&d=56&h=BD` | A small badge saying whether someone is working now (working, off, weekend or holiday), with the same parameters as a My hours link. Cached for 5 minutes |
-| `GET /v1/health` | Health check |
-| `GET /docs` | Interactive docs |
-
-`/v1/slots` options: `top` (1–50, default 10) and `format` (`json`, `text` or `ics`).
-
-`/v1/slots` and `/v1/recurring` accept a repeatable `holidayPreset=IANA_ZONE=BD|GB-ENG|IN|PK|AE|US` to block that country's public holidays (POST bodies use `holidayPreset` on each zone). POST zones also accept `busy: [{ start, end }]` intervals (ISO instants) to block calendar busy times.
-
-Both also accept repeatable `specialHours=IANA_ZONE=YYYY-MM-DD..YYYY-MM-DD@HH:mm-HH:mm` and `ramadan=IANA_ZONE=HH:mm-HH:mm` for different work hours (POST zones use `specialHours`). Repeat `optional=IANA_ZONE` (or set `optional: true` on a POST zone) for attendees who shouldn't block a time. Add `format=ics` to `/v1/recurring` to get the weekly series as a calendar file. Add `rotation=2` or `3` to `/v1/slots` to get a `rotation` suggestion: times to alternate weekly so no city always gets the inconvenient slot.
-
-## Examples
+## Quick start
 
 ```sh
-# Find times
 curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&top=3"
 
-# Get a calendar file
-curl "http://localhost:3000/v1/slots?zones=Asia/Dhaka,Europe/London&date=2026-11-02&format=ics" -o meetings.ics
-
-# Custom work hours per city
-curl http://localhost:3000/v1/slots -H 'Content-Type: application/json' -d '{
-  "zones": [
-    {"id": "Asia/Dhaka", "workStart": "10:00", "workEnd": "17:00"},
-    {"id": "Europe/London"}
-  ],
-  "startDate": "2026-11-02"
-}'
+curl http://localhost:3000/v1/slots -H "Content-Type: application/json" \
+  -d '{"zones":[{"id":"Asia/Dhaka","workStart":"10:00","workEnd":"17:00"},{"id":"Europe/London"}],"startDate":"2026-11-02"}'
 ```
 
-Errors look like this:
+## API
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /v1/slots`, `POST /v1/slots` | Meeting slots (`zones`, `date`, `duration`, `days`, `top`, `format`) |
+| `GET /v1/recurring` | A weekly meeting through DST changes (`zones`, `date`, `time`, `weeks`) |
+| `GET /v1/zones` | Time zone search (`search`) |
+| `GET /v1/convert` | A local time in other zones (`time`, `from`, `to`) |
+| `GET /v1/cron` | Cron description, next runs and DST warnings (`expression`, `zone`, `display`) |
+| `GET /v1/cron/convert` | Cron in another dialect or zone (`expression`, `to`, `zone`, `toZone`) |
+| `GET /v1/cron/natural` | Cron from plain English (`text`, `dialect`) |
+| `GET /v1/holidays`, `GET /v1/holidays.ics` | Public holidays as JSON (`preset`, `year`) or a calendar feed (`preset`) |
+| `GET /v1/badge.svg` | Working-now status badge |
+| `GET /v1/health` | Health check |
+
+`/v1/slots` and `/v1/recurring` also take repeatable per-zone parameters in the form `ZONE=value`: `holidayPreset` (`BD`, `GB-ENG`, `IN`, `PK`, `AE`, `US`), `specialHours`, `ramadan` and `optional`. `POST` bodies set these on each zone and also accept `busy: [{ start, end }]`. See `/docs` for every parameter.
+
+Errors return JSON with a `code`, a `message` and per-field `details`:
 
 ```json
 { "error": { "code": "VALIDATION_ERROR", "message": "zones[1].id: 'Asia/Dhka' is not a valid IANA time zone. Did you mean 'Asia/Dhaka'?" } }
 ```
 
-## Settings
+## Configuration
 
-Set these as environment variables:
-
-| Variable | Default | What it does |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `3000` | Port to listen on |
-| `HOST` | `0.0.0.0` | Address to listen on |
-| `API_KEYS` | not set | Comma-separated keys. When set, requests need `Authorization: Bearer <key>` or `X-API-Key` |
+| `PORT` / `HOST` | `3000` / `0.0.0.0` | Listen address |
+| `API_KEYS` | not set | Comma-separated keys; requests then need `Authorization: Bearer <key>` or `X-API-Key` |
 | `CORS_ORIGINS` | `*` | Allowed browser origins |
-| `RATE_LIMIT` | `60` | Requests per IP per window |
-| `RATE_WINDOW_MS` | `60000` | Rate limit window in milliseconds |
+| `RATE_LIMIT` / `RATE_WINDOW_MS` | `60` / `60000` | Requests per IP per window |
 
-Limits: 32 KB request body, 8 cities, 14 days, 50 results. Rate limits are kept in memory per server, so they reset on restart.
+Limits: 32 KB request body, 8 zones, 14 days, 50 results. Rate-limit counters are kept in memory per instance.
 
-License: MIT
+## Compatibility
+
+Node.js 22.12 or later, Docker, or Cloudflare Workers (`wrangler.toml` in this folder).
+
+## License
+
+[MIT](LICENSE)

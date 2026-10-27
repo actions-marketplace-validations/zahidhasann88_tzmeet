@@ -1,3 +1,11 @@
 packages:
   - packages/*
   - apps/*
+
+# Held back on purpose; pnpm outdated and pnpm update skip these.
+# typescript: typescript-eslint supports up to 6.0 (TS 7 has no JS compiler API).
+# @types/node: matches the oldest supported Node (engines: >=22.12).
+updateConfig:
+  ignoreDependencies:
+    - typescript
+    - "@types/node"
